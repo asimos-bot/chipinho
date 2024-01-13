@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>chipinho</title>
+  </head>
+  <body>
+    <script type="module">
+      const memory = new WebAssembly.Memory({
+        initial: 10,
+        maximum: 100,
+        shared: true
+      });
+      const importObj = {
+        Math: {
+          random: () => Math.random();
+        },
+        js: {
+          mem: memory
+        }
+      };
+      const response = await fetch("./target/wasm32-unknown-unknown/release/chipinho.wasm");
+      const {instance} = await WebAssembly.instantiateStreaming(response, importObj);
+
+      console.log(instance.exports.add(40, 2)) // returns 42
+      // import init, { flush_reload } from "./pkg/flush_reload.js";
+      // init().then(() => {
+      //   flush_reload("WebAssembly");
+      // });
+    </script>
+    <div style="width: auto;">
+      <canvas id="results"></canvas>
+    </div>
+    <button id="btn-start-attack">start attack</button>
+    <button id="btn-reload">reload</button>
+  </body>
+</html>

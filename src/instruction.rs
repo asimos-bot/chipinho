@@ -1,0 +1,133 @@
+use crate::prelude::error::Error;
+
+pub enum Instruction {
+    Op0nnn(u32),
+    Op00E0,
+    Op00EE,
+    Op1nnn(u32),
+    Op2nnn(u32),
+    Op3xkk(u8, u16),
+    Op4xkk(u8, u16),
+    Op5xy0(u8, u8),
+    Op6xkk(u8, u16),
+    Op7xkk(u8, u16),
+    Op8xy0(u8, u8),
+    Op8xy1(u8, u8),
+    Op8xy2(u8, u8),
+    Op8xy3(u8, u8),
+    Op8xy4(u8, u8),
+    Op8xy5(u8, u8),
+    Op8xy6(u8, u8),
+    Op8xy7(u8, u8),
+    Op8xyE(u8, u8),
+    Op9xy0(u8, u8),
+    OpAnnn(u32),
+    OpBnnn(u32),
+    OpCxkk(u8, u16),
+    OpDxyn(u8, u8, u8),
+    OpEx9E(u8),
+    OpExA1(u8),
+    OpFx07(u8),
+    OpFx0A(u8),
+    OpFx15(u8),
+    OpFx18(u8),
+    OpFx1E(u8),
+    OpFx29(u8),
+    OpFx33(u8),
+    OpFx55(u8),
+    OpFx65(u8)
+}
+
+impl Instruction {
+    pub fn parse(opcode: u16) -> Result<Self, Error> {
+        let nibbles = (
+            (opcode & 0xF000) >> 12 as u8,
+            (opcode & 0x0F00) >> 8 as u8,
+            (opcode & 0x00F0) >> 4 as u8,
+            (opcode & 0x000F) as u8,
+        );
+        let nnn = (opcode & 0x0FFF) as u32;
+        let kk = (opcode & 0x00FF) as u16;
+        let x = nibbles.1 as u8;
+        let y = nibbles.2 as u8;
+        let n = nibbles.3 as u8;
+
+        match nibbles {
+            (0x0, 0x0, 0xE, 0x0) => Ok(Instruction::Op00E0),
+            (0x0, 0x0, 0xE, 0xE) => Ok(Instruction::Op00EE),
+            (0x0, _, _, _) => Ok(Instruction::Op0nnn(nnn)),
+            (0x1, _, _, _) => Ok(Instruction::Op1nnn(nnn)),
+            (0x2, _, _, _) => Ok(Instruction::Op2nnn(nnn)),
+            (0x3, _, _, _) => Ok(Instruction::Op3xkk(x, kk)),
+            (0x4, _, _, _) => Ok(Instruction::Op4xkk(x, kk)),
+            (0x5, _, _, 0x0) => Ok(Instruction::Op5xy0(x, y)),
+            (0x6, _, _, _) => Ok(Instruction::Op6xkk(x, kk)),
+            (0x7, _, _, _) => Ok(Instruction::Op7xkk(x, kk)),
+            (0x8, _, _, 0x0) => Ok(Instruction::Op8xy0(x, y)),
+            (0x8, _, _, 0x1) => Ok(Instruction::Op8xy1(x, y)),
+            (0x8, _, _, 0x2) => Ok(Instruction::Op8xy2(x, y)),
+            (0x8, _, _, 0x3) => Ok(Instruction::Op8xy3(x, y)),
+            (0x8, _, _, 0x4) => Ok(Instruction::Op8xy4(x, y)),
+            (0x8, _, _, 0x5) => Ok(Instruction::Op8xy5(x, y)),
+            (0x8, _, _, 0x6) => Ok(Instruction::Op8xy6(x, y)),
+            (0x8, _, _, 0x7) => Ok(Instruction::Op8xy7(x, y)),
+            (0x8, _, _, 0xE) => Ok(Instruction::Op8xyE(x, y)),
+            (0x9, _, _, 0x0) => Ok(Instruction::Op9xy0(x, y)),
+            (0xA, _, _, _) => Ok(Instruction::OpAnnn(nnn)),
+            (0xB, _, _, _) => Ok(Instruction::OpBnnn(nnn)),
+            (0xC, _, _, _) => Ok(Instruction::OpCxkk(x, kk)),
+            (0xD, _, _, _) => Ok(Instruction::OpDxyn(x, y, n)),
+            (0xE, _, 0x9, 0xE) => Ok(Instruction::OpEx9E(x)),
+            (0xE, _, 0xA, 0x1) => Ok(Instruction::OpExA1(x)),
+            (0xF, _, 0x0, 0x7) => Ok(Instruction::OpFx07(x)),
+            (0xF, _, 0x0, 0xA) => Ok(Instruction::OpFx0A(x)),
+            (0xF, _, 0x1, 0x5) => Ok(Instruction::OpFx15(x)),
+            (0xF, _, 0x1, 0x8) => Ok(Instruction::OpFx18(x)),
+            (0xF, _, 0x1, 0xE) => Ok(Instruction::OpFx1E(x)),
+            (0xF, _, 0x2, 0x9) => Ok(Instruction::OpFx29(x)),
+            (0xF, _, 0x3, 0x3) => Ok(Instruction::OpFx33(x)),
+            (0xF, _, 0x5, 0x5) => Ok(Instruction::OpFx55(x)),
+            (0xF, _, 0x6, 0x5) => Ok(Instruction::OpFx65(x)),
+            _ => Err(Error::ParseInvalidInstruction(opcode))
+        }
+    }
+    pub fn to_str(&self) -> &'static str {
+        match *self {
+            Instruction::Op0nnn(_) => "0nnn",
+            Instruction::Op00E0 => "00E0",
+            Instruction::Op00EE => "00EE",
+            Instruction::Op1nnn(_) => "1nnn",
+            Instruction::Op2nnn(_) => "2nnn",
+            Instruction::Op3xkk(_, _) => "3xkk",
+            Instruction::Op4xkk(_, _) => "4xkk",
+            Instruction::Op5xy0(_, _) => "5xy0",
+            Instruction::Op6xkk(_, _) => "6xkk",
+            Instruction::Op7xkk(_, _) => "7xkk",
+            Instruction::Op8xy0(_, _) => "8ky0",
+            Instruction::Op8xy1(_, _) => "8ky1",
+            Instruction::Op8xy2(_, _) => "8xy2",
+            Instruction::Op8xy3(_, _) => "8xy3",
+            Instruction::Op8xy4(_, _) => "8xy4",
+            Instruction::Op8xy5(_, _) => "8xy5",
+            Instruction::Op8xy6(_, _) => "8xy6",
+            Instruction::Op8xy7(_, _) => "8xy7",
+            Instruction::Op8xyE(_, _) => "8xyE",
+            Instruction::Op9xy0(_, _) => "9xy0",
+            Instruction::OpAnnn(_) => "Annn",
+            Instruction::OpBnnn(_) => "Bnnn",
+            Instruction::OpCxkk(_, _) => "Cxkk",
+            Instruction::OpDxyn(_, _, _) => "Dxyn",
+            Instruction::OpEx9E(_) => "Ex9E",
+            Instruction::OpExA1(_) => "ExA1",
+            Instruction::OpFx07(_) => "Fx07",
+            Instruction::OpFx0A(_) => "Fx0A",
+            Instruction::OpFx15(_) => "Fx15",
+            Instruction::OpFx18(_) => "Fx18",
+            Instruction::OpFx1E(_) => "Fx1E",
+            Instruction::OpFx29(_) => "Fx29",
+            Instruction::OpFx33(_) => "Fx33",
+            Instruction::OpFx55(_) => "Fx55",
+            Instruction::OpFx65(_) => "Fx65",
+        }
+    }
+}
