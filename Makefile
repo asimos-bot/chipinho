@@ -1,6 +1,7 @@
 .PHONY: build-wasm
 build-wasm:
-	cargo build --target=wasm32-unknown-unknown --release
-	# wasm-opt -O3 -o target/wasm32-unknown-unknown/release/chipinho.wasm target/wasm32-unknown-unknown/release/chipinho.wasm
+	cargo build --target wasm32-unknown-unknown --release
 show-wasm: build-wasm
 	wasm2wat target/wasm32-unknown-unknown/release/chipinho.wasm | less
+serve-wasm: build-wasm
+	python3 -m http.server

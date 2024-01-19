@@ -1,47 +1,48 @@
+use alloc::vec::{Vec, self};
+
+use crate::constants::{NUM_REGISTERS, MAX_STACK_SIZE, MEMORY_SIZE, DISPLAY_WIDTH, DISPLAY_HEIGHT, PROGRAM_BEGIN_ADDR, FONT_BEGIN_ADDR, RANDOM_MULTIPLIER, RANDOM_MODULE, RANDOM_INCREMENT, NUM_KEYS};
 use crate::{instruction::Instruction, error::Error};
 use crate::font::{FONT_SET, FONT_SIZE};
+use core::alloc::GlobalAlloc;
+use core::mem;
 
-const PROGRAM_BEGIN_ADDR : u16 = 0x200;
-const NUM_REGISTERS : usize = 16;
-const MAX_STACK_SIZE : usize = 32;
-const NUM_KEYS : usize = 16;
-const FONT_BEGIN_ADDR : u16 = 0x00;
-const MEMORY_SIZE : u16 = 4096;
-const DISPLAY_HEIGHT : u8 = 64;
-const DISPLAY_WIDTH : u8 = 32;
-const RANDOM_MULTIPLIER : u8 = 42;
-const RANDOM_INCREMENT : u8 = 31;
-const RANDOM_MODULE : u8 = 13;
-
-struct Emulator {
-    memory: [u8; MEMORY_SIZE as usize],
-    vram: [[bool; DISPLAY_WIDTH as usize]; DISPLAY_HEIGHT as usize],
-    program_counter: u16,
-    registers: [u8; NUM_REGISTERS],
-    stack: [u16; MAX_STACK_SIZE],
-    stack_size: u16,
-    index: u16,
-    delay_timer: u8,
-    sound_timer: u8,
-    waiting_for_key: Option<usize>,
-    last_random_u8: u8
+#[repr(C)]
+pub struct Emulator {
+    pub program_counter: u16,
+    pub index: u16,
+    pub delay_timer: u8,
+    pub sound_timer: u8,
+    pub waiting_for_key: Option<usize>,
+    pub last_random_u8: u8,
+    pub stack_size: u16,
+    pub registers: [u8; NUM_REGISTERS],
+    pub stack: [u16; MAX_STACK_SIZE],
+    pub memory: [u8; MEMORY_SIZE as usize],
+    pub vram: [bool; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
 }
+
+pub const EMULATOR_SIZE : usize = mem::size_of::<Emulator>();
 
 impl Emulator {
     #[no_mangle]
+    pub extern "C" fn get_emulator_size() -> usize {
+        EMULATOR_SIZE
+    }
+
+    #[no_mangle]
     pub extern "C" fn new() -> Self {
         let mut emulator = Emulator {
-            memory: [0; MEMORY_SIZE as usize],
             program_counter: PROGRAM_BEGIN_ADDR,
-            registers: [0; NUM_REGISTERS],
-            stack: [0; MAX_STACK_SIZE],
             index: 0,
             delay_timer: 0,
             sound_timer: 0,
-            stack_size: 0,
             waiting_for_key: None,
-            vram: [[false; DISPLAY_WIDTH as usize]; DISPLAY_HEIGHT as usize],
-            last_random_u8: 123
+            last_random_u8: 123,
+            stack_size: 0,
+            registers: [0; NUM_REGISTERS],
+            stack: [0; MAX_STACK_SIZE],
+            memory: [0; MEMORY_SIZE as usize],
+            vram: [false; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
         };
         // load fonts to memory
         emulator.memory
@@ -54,15 +55,105 @@ impl Emulator {
     }
 
     #[no_mangle]
-    pub extern "C" fn get_memory(&self) -> [u8; MEMORY_SIZE as usize] {
-        self.memory.clone()
+    pub extern "C" fn get_memory_ptr(&self) -> *const u8 {
+        let u8_slice: &[u8] = unsafe {
+            core::slice::from_raw_parts(self.memory.as_ptr() as *const u8, self.memory.len())
+        };
+        u8_slice.as_ptr()
     }
 
     #[no_mangle]
-    pub extern "C" fn get_vram(&self) -> [[bool; DISPLAY_WIDTH as usize]; DISPLAY_HEIGHT as usize] {
-        self.vram.clone()
+    pub extern "C" fn get_vram_ptr(&self) -> *const u8 {
+       // Convert the bool slice to a u8 slice
+        let u8_slice: &[u8] = unsafe {
+            core::slice::from_raw_parts(self.vram.as_ptr() as *const u8, self.vram.len())
+        };
+
+        // Return the pointer to the u8 slice
+        u8_slice.as_ptr()
     }
 
+    #[no_mangle]
+    pub extern "C" fn get_program_counter(&self) -> u16 {
+        self.program_counter
+    }
+    #[no_mangle]
+    pub extern "C" fn set_program_counter(&mut self, program_counter: u16) {
+        self.program_counter = program_counter;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_index(&self) -> u16 {
+        self.index
+    }
+    #[no_mangle]
+    pub extern "C" fn set_index(&mut self, index: u16) {
+        self.index = index;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_delay_timer(&self) -> u8 {
+        self.delay_timer
+    }
+    #[no_mangle]
+    pub extern "C" fn set_delay_timer(&mut self, delay_timer: u8) {
+        self.delay_timer = delay_timer;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_sound_timer(&self) -> u8 {
+        self.sound_timer
+    }
+    #[no_mangle]
+    pub extern "C" fn set_sound_timer(&mut self, sound_timer: u8) {
+        self.sound_timer = sound_timer;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_waiting_for_key(&self) -> Option<usize> {
+        self.waiting_for_key
+    }
+    #[no_mangle]
+    pub extern "C" fn set_waiting_for_key(&mut self, waiting_for_key: Option<usize>) {
+        self.waiting_for_key = waiting_for_key;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_last_random_u8(&self) -> u8 {
+        self.last_random_u8
+    }
+    #[no_mangle]
+    pub extern "C" fn get_set_last_random_u8(&mut self, last_random_u8: u8) {
+        self.last_random_u8 = last_random_u8;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_stack_size(&self) -> u16 {
+        self.stack_size
+    }
+    #[no_mangle]
+    pub extern "C" fn set_stack_size(&mut self, stack_size: u16) {
+        self.stack_size = stack_size;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_registers(&self) -> [u8; NUM_REGISTERS] {
+        self.registers
+    }
+    #[no_mangle]
+    pub extern "C" fn set_registers(&mut self, registers: &[u8; NUM_REGISTERS]) {
+        self.registers = registers.clone();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_stack(&self) -> [u16; MAX_STACK_SIZE] {
+        self.stack
+    }
+    #[no_mangle]
+    pub extern "C" fn set_stack(&mut self, stack: &[u16; MAX_STACK_SIZE]) {
+        self.stack = stack.clone();
+    }
+    
     #[no_mangle]
     pub extern "C" fn should_beep(&self) -> bool {
         self.sound_timer > 0
@@ -88,7 +179,8 @@ impl Emulator {
         self.last_random_u8
     }
 
-    fn get_opcode(&self) -> Result<Instruction, Error> {
+    #[no_mangle]
+    pub fn get_opcode(&self) -> Result<Instruction, Error> {
         let first_byte : u8 = self.memory
             .get(self.program_counter as usize)
             .cloned()
@@ -103,7 +195,7 @@ impl Emulator {
     }
 
     #[no_mangle]
-    pub extern "C" fn tick(&mut self, keypad: [bool; NUM_KEYS]) -> Result<(), Error> {
+    pub extern "C" fn tick(&mut self, keypad: &[bool]) -> Result<(), Error> {
         match self.waiting_for_key {
             Some(key_index) => if keypad[key_index] {
                 self.waiting_for_key = None;
@@ -123,7 +215,7 @@ impl Emulator {
         Ok(())
     }
 
-    fn run_opcode(&mut self, opcode : Instruction, keypad: &[bool; NUM_KEYS]) -> () {
+    fn run_opcode(&mut self, opcode : Instruction, keypad: &[bool]) -> () {
         match opcode {
             Instruction::Op0nnn(addr) => {
                 self.program_counter = addr as u16;
@@ -131,11 +223,7 @@ impl Emulator {
             Instruction::Op00E0 => {
                 self.vram
                     .iter_mut()
-                    .for_each(|row| {
-                        row
-                            .iter_mut()
-                            .for_each(|pixel| *pixel = false)
-                    });
+                    .for_each(|pixel| *pixel = false);
                 self.program_counter += 1;
             },
             Instruction::Op00EE => {
@@ -239,6 +327,8 @@ impl Emulator {
                 self.program_counter += 1;
             },
             Instruction::OpDxyn(x, y, value) => {
+                let x_wrapped = x + 8 % DISPLAY_WIDTH;
+                let y_wrapped = y + value % DISPLAY_HEIGHT;
                 self.memory
                     .iter()
                     .skip(self.index as usize)
@@ -253,17 +343,18 @@ impl Emulator {
                         // get section of vram we will draw at
                         self.vram
                             .iter_mut()
-                            // cut rows (no wrap around)
-                            .skip(y as usize)
-                            .take(value as usize)
-                            // cut columns (no wrap around)
-                            .map(|row| {
-                                row
-                                    .iter_mut()
-                                    .skip(x as usize)
-                                    .take(8)
+                            .enumerate()
+                            .filter_map(|(index, pixel)| {
+                                let px = index as u8 % DISPLAY_HEIGHT;
+                                let py = index as u8 / DISPLAY_HEIGHT;
+                                let x_is_valid = px < x_wrapped || (px >= x && px < x + 8);
+                                let y_is_valid = py < y_wrapped || (py >= y && py < y + value);
+                                if x_is_valid && y_is_valid {
+                                    return Some(pixel);
+                                }
+                                None
                             })
-                            .flatten()
+                            
                     )
                     .for_each(|(memory_bit, vram_bit)| {
                         if *vram_bit == memory_bit && !*vram_bit {
@@ -353,22 +444,30 @@ impl Emulator {
     }
 }
 
-// mod math {
-//     mod math_js {
-//         #[link(wasm_import_module = "Math")]
-//         extern "C" {
-//             #[link_name = "random"]
-//             pub fn random() -> f64;
-//         }
-//     }
-//     pub fn random() -> f64 {
-//         unsafe { math_js::random() }
-//     }
-// }
-//
-//
-// #[export_name = "add"]
-// #[no_mangle]
-// pub extern "C" fn add(left: f64, right: f64) -> f64 {
-//     left + right + math::random()
-// }
+mod math {
+    mod math_js {
+        #[link(wasm_import_module = "Math")]
+        extern "C" {
+            #[link_name = "random"]
+            pub fn random() -> f64;
+        }
+    }
+    pub fn random() -> f64 {
+        unsafe { math_js::random() }
+    }
+}
+
+
+#[export_name = "add"]
+#[no_mangle]
+pub extern "C" fn add(left: f64, right: f64) -> f64 {
+    left + right + math::random()
+}
+
+#[no_mangle]
+pub extern "C" fn alloc(len: usize) -> *const u8 {
+    let data: Vec<u8> = Vec::with_capacity(len);
+    let raw_ptr = data.as_ptr();
+    core::mem::forget(data);
+    raw_ptr
+}

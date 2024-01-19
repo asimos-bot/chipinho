@@ -8,17 +8,15 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
-# [[bin]]
-# name = "chipinho"
-# path = "src/bin/main.rs"
-
 [profile.dev]
 panic = "abort"
 
 [profile.release]
 panic = "abort"
-# strip = true
+strip = "debuginfo"
+# opt-level = 'z'
 # lto = true
 # wasm-opt = true
 
-[dependencies]
+[build]
+target = "wasm32-unknown-unknown"
