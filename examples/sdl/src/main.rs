@@ -1,5 +1,6 @@
 use std::env;
 use std::error::Error;
+use std::time::Instant;
 
 use chipinho::constants::{DISPLAY_WIDTH, DISPLAY_HEIGHT, NUM_KEYS};
 
@@ -53,26 +54,26 @@ fn dummy_texture<'a>(
                         }
                     }
                 };
-                for i in 0..PIXEL_SIZE {
-                    for j in 0..PIXEL_SIZE {
-                        // drawing pixel by pixel isn't very effective, but we only do it once and store
-                        // the texture afterwards so it's still alright!
-                        if (i + j) % 7 == 0 {
-                            // this doesn't mean anything, there was some trial and serror to find
-                            // something that wasn't too ugly
-                            texture_canvas.set_draw_color(Color::RGB(255, 255, 255));
-                            texture_canvas
-                                .draw_point(Point::new(i as i32, j as i32))
-                                .expect("could not draw point");
-                        }
-                        if (i + j * 2) % 5 == 0 {
-                            texture_canvas.set_draw_color(Color::RGB(127, 127, 127));
-                            texture_canvas
-                                .draw_point(Point::new(i as i32, j as i32))
-                                .expect("could not draw point");
-                        }
-                    }
-                }
+                // for i in 0..PIXEL_SIZE {
+                //     for j in 0..PIXEL_SIZE {
+                //         // drawing pixel by pixel isn't very effective, but we only do it once and store
+                //         // the texture afterwards so it's still alright!
+                //         if (i + j) % 7 == 0 {
+                //             // this doesn't mean anything, there was some trial and serror to find
+                //             // something that wasn't too ugly
+                //             texture_canvas.set_draw_color(Color::RGB(255, 255, 255));
+                //             texture_canvas
+                //                 .draw_point(Point::new(i as i32, j as i32))
+                //                 .expect("could not draw point");
+                //         }
+                //         if (i + j * 2) % 5 == 0 {
+                //             texture_canvas.set_draw_color(Color::RGB(127, 127, 127));
+                //             texture_canvas
+                //                 .draw_point(Point::new(i as i32, j as i32))
+                //                 .expect("could not draw point");
+                //         }
+                //     }
+                // }
             })
             .map_err(|e| e.to_string())?;
     }
@@ -131,11 +132,11 @@ pub fn main() -> Result<(), String> {
     let white_pixel = dummy_texture(&mut canvas, &texture_creator)?;
 
     let mut event_pump = sdl_context.event_pump()?;
-    let mut frame: u32 = 0;
 
     let mut emulator = Emulator::new();
     emulator.load_program(&program).map_err(|e| format!("error loading program"))?;
     let mut keypad : [bool; NUM_KEYS] = [false; NUM_KEYS];
+    let mut start = Instant::now();
 
     'running: loop {
         // get the inputs here
@@ -151,10 +152,6 @@ pub fn main() -> Result<(), String> {
                     repeat: false,
                     ..
                 } => {
-                    println!("program_counter: {}", emulator.program_counter);
-                    println!("opcode: {}", emulator.get_opcode()
-                             .map_err(|e| format!("couldn't retrieve opcode"))?.to_str());
-                    emulator.tick(&keypad).map_err(|e| format!("error on tick: {:?}", e))?;
                 }
                 Event::MouseButtonDown {
                     x,
@@ -169,9 +166,9 @@ pub fn main() -> Result<(), String> {
         }
 
         // update the game loop here
-        if frame >= 60 {
-            // emulator.tick(&keypad).map_err(|e| format!("error on tick: {:?}", e))?;
-            frame = 0;
+        if (Instant::now() - start).as_millis() >= 16 {
+            // println!("opcode: {}", emulator.get_opcode().map_err(|e| format!("error getting opcode"))?.to_str());
+            emulator.tick(&keypad).map_err(|e| format!("error on tick: {:?}", e))?;
         }
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -184,12 +181,14 @@ pub fn main() -> Result<(), String> {
             .try_for_each(|(index, pixel)| -> Result<(), String> {
                 let i = index as u32;
                 if *pixel {
+                    let x = i % DISPLAY_WIDTH as u32;
+                    let y = i / DISPLAY_WIDTH as u32;
                     canvas.copy(
                         &white_pixel,
                         None,
                         Rect::new(
-                            ((i % DISPLAY_WIDTH as u32) * PIXEL_SIZE) as i32,
-                            ((i / DISPLAY_HEIGHT as u32) * PIXEL_SIZE) as i32,
+                            (x * PIXEL_SIZE) as i32,
+                            (y * PIXEL_SIZE) as i32,
                             PIXEL_SIZE,
                             PIXEL_SIZE,
                         )

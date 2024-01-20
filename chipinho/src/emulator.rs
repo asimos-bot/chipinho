@@ -139,32 +139,32 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::Op00EE => {
+                self.stack_size -= 1;
                 self.program_counter = self.stack[self.stack_size as usize];
-                self.stack_size -= 1
             },
             Instruction::Op1nnn(addr) => {
                 self.program_counter = addr as u16;
             },
             Instruction::Op2nnn(addr) => {
-                self.stack[self.stack_size as usize] = self.program_counter;
+                self.stack[self.stack_size as usize] = self.program_counter + 2;
                 self.stack_size += 1;
                 self.program_counter = addr as u16;
             },
             Instruction::Op3xkk(register_index, value) => {
-                if self.registers[register_index as usize] as u16 == value {
-                    self.program_counter += 4;
+                if self.registers[register_index as usize] == value as u8 {
+                    self.program_counter += 2;
                 }
                 self.program_counter += 2;
             },
             Instruction::Op4xkk(register_index, value) => {
                 if self.registers[register_index as usize] as u16 != value {
-                    self.program_counter += 4;
+                    self.program_counter += 2;
                 }
                 self.program_counter += 2;
             },
             Instruction::Op5xy0(register_index1, register_index2) => {
                 if self.registers[register_index1 as usize] == self.registers[register_index2 as usize] {
-                    self.program_counter += 4;
+                    self.program_counter += 2;
                 }
                 self.program_counter += 2;
             },
@@ -173,7 +173,7 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::Op7xkk(register_index, value) => {
-                self.registers[register_index as usize] += value as u8;
+                self.registers[register_index as usize] = self.registers[register_index as usize].wrapping_add(value as u8);
                 self.program_counter += 2;
             },
             Instruction::Op8xy0(register_index1, register_index2) => {
@@ -199,9 +199,9 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::Op8xy5(register_index1, register_index2) => {
-                let result : u16 = self.registers[register_index1 as usize] as u16 - self.registers[register_index2 as usize] as u16;
+                let result : u8 = self.registers[register_index1 as usize].wrapping_sub(self.registers[register_index2 as usize]);
                 self.registers[NUM_REGISTERS - 1] = if self.registers[register_index1 as usize] > self.registers[register_index2 as usize] { 1 } else { 0 };
-                self.registers[register_index1 as usize] = result as u8;
+                self.registers[register_index1 as usize] = result;
                 self.program_counter += 2;
             },
             Instruction::Op8xy6(register_index1, register_index2) => {
@@ -210,9 +210,9 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::Op8xy7(register_index1, register_index2) => {
-                let result : u16 = self.registers[register_index2 as usize] as u16 - self.registers[register_index1 as usize] as u16;
+                let result : u8 = self.registers[register_index2 as usize].wrapping_sub(self.registers[register_index1 as usize]);
                 self.registers[NUM_REGISTERS - 1] = if self.registers[register_index2 as usize] > self.registers[register_index1 as usize] { 1 } else { 0 };
-                self.registers[register_index1 as usize] = result as u8;
+                self.registers[register_index1 as usize] = result;
                 self.program_counter += 2;
             },
             Instruction::Op8xyE(register_index1, register_index2) => {
@@ -222,7 +222,7 @@ impl Emulator {
             },
             Instruction::Op9xy0(register_index1, register_index2) => {
                 if self.registers[register_index1 as usize] != self.registers[register_index2 as usize] {
-                    self.program_counter += 4;
+                    self.program_counter += 2;
                 }
                 self.program_counter += 2;
             },
@@ -238,9 +238,12 @@ impl Emulator {
                 self.registers[register_index as usize] = self.get_random_u8() & value as u8;
                 self.program_counter += 2;
             },
-            Instruction::OpDxyn(x, y, value) => {
-                let x_wrapped = x + 8 % DISPLAY_WIDTH;
-                let y_wrapped = y + value % DISPLAY_HEIGHT;
+            Instruction::OpDxyn(register_index1, register_index2, value) => {
+                let x = self.registers[register_index1 as usize];
+                let y = self.registers[register_index2 as usize];
+                let x_wrapped = if x + 8 >= DISPLAY_WIDTH { (x + 8) as usize % DISPLAY_WIDTH as usize } else { 0 };
+                let y_wrapped = if y + value >= DISPLAY_HEIGHT { (y + value) as usize % DISPLAY_HEIGHT as usize } else { 0 };
+                self.registers[NUM_REGISTERS - 1] = 0;
                 self.memory
                     .iter()
                     .skip(self.index as usize)
@@ -249,7 +252,7 @@ impl Emulator {
                     .flat_map(|byte| 
                         (0..8)
                             .into_iter()
-                            .map(move |index| (byte & (0b1000_0000 >> index)) > 0)
+                            .map(move |index| (byte & (0b1000_0000 >> index)) != 0)
                     )
                     .zip(
                         // get section of vram we will draw at
@@ -257,34 +260,33 @@ impl Emulator {
                             .iter_mut()
                             .enumerate()
                             .filter_map(|(index, pixel)| {
-                                let px = index as u8 % DISPLAY_HEIGHT;
-                                let py = index as u8 / DISPLAY_HEIGHT;
-                                let x_is_valid = px < x_wrapped || (px >= x && px < x + 8);
-                                let y_is_valid = py < y_wrapped || (py >= y && py < y + value);
+                                let px = index % DISPLAY_WIDTH as usize;
+                                let py = index / DISPLAY_WIDTH as usize;
+                                let x_is_valid = px < x_wrapped || (px >= x as usize && px < (x + 8) as usize);
+                                let y_is_valid = py < y_wrapped || (py >= y as usize && py < (y + value) as usize);
                                 if x_is_valid && y_is_valid {
                                     return Some(pixel);
                                 }
                                 None
                             })
-                            
                     )
-                    .for_each(|(memory_bit, vram_bit)| {
-                        if *vram_bit == memory_bit && !*vram_bit {
+                    .for_each(|(memory_bit, vram_pixel)| {
+                        if *vram_pixel == memory_bit && *vram_pixel {
                             self.registers[NUM_REGISTERS - 1] = 1;
                         }
-                        *vram_bit = *vram_bit != memory_bit;
+                        *vram_pixel = *vram_pixel != memory_bit;
                     });
                 self.program_counter += 2;
             },
             Instruction::OpEx9E(register_index) => {
                 if keypad[self.registers[register_index as usize] as usize] {
-                    self.program_counter += 4;
+                    self.program_counter += 2;
                 }
                 self.program_counter += 2;
             },
             Instruction::OpExA1(register_index) => {
                 if !keypad[self.registers[register_index as usize] as usize] {
-                    self.program_counter += 4;
+                    self.program_counter += 2;
                 }
                 self.program_counter += 2;
             },
@@ -315,11 +317,7 @@ impl Emulator {
             },
             Instruction::OpFx33(register_index) => {
                 let mut value = self.registers[register_index as usize];
-                let mut digits : [u8; 3] = [0, 0, value % 10];
-                value /= 10;
-                digits[1] = value % 10;
-                value /= 10;
-                digits[0] = value;
+                let mut digits : [u8; 3] = [value / 100, (value % 100) / 10, value % 10];
                 self.memory
                     .iter_mut()
                     .skip(self.index as usize)
@@ -334,10 +332,13 @@ impl Emulator {
                 self.memory
                     .iter_mut()
                     .skip(self.index as usize)
-                    .take(register_index as usize)
-                    .zip(self.registers)
+                    .take(register_index as usize + 1)
+                    .zip(self.registers
+                         .iter()
+                         .take(register_index as usize + 1)
+                    )
                     .for_each(|(byte, register)| {
-                        *byte = register
+                        *byte = *register
                     });
                 self.program_counter += 2;
             },
@@ -345,8 +346,11 @@ impl Emulator {
                 self.memory
                     .iter()
                     .skip(self.index as usize)
-                    .take(register_index as usize)
-                    .zip(self.registers.iter_mut())
+                    .take(register_index as usize + 1)
+                    .zip(self.registers
+                         .iter_mut()
+                         .take(register_index as usize + 1)
+                    )
                     .for_each(|(byte, register)| {
                         *register = *byte;
                     });
