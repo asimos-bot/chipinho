@@ -1,3 +1,6 @@
+use std::env;
+use std::error::Error;
+
 use chipinho::constants::{DISPLAY_WIDTH, DISPLAY_HEIGHT, NUM_KEYS};
 
 use chipinho::emulator::Emulator;
@@ -14,22 +17,17 @@ const PIXEL_SIZE : u32 = 10;
 fn dummy_texture<'a>(
     canvas: &mut Canvas<Window>,
     texture_creator: &'a TextureCreator<WindowContext>,
-) -> Result<(Texture<'a>, Texture<'a>), String> {
+) -> Result<Texture<'a>, String> {
     enum TextureColor {
         White,
-        Black,
     }
-    let mut square_texture1 = texture_creator
-        .create_texture_target(None, PIXEL_SIZE, PIXEL_SIZE)
-        .map_err(|e| e.to_string())?;
-    let mut square_texture2 = texture_creator
+    let mut white_pixel = texture_creator
         .create_texture_target(None, PIXEL_SIZE, PIXEL_SIZE)
         .map_err(|e| e.to_string())?;
     // let's change the textures we just created
     {
         let textures = vec![
-            (&mut square_texture1, TextureColor::White),
-            (&mut square_texture2, TextureColor::Black),
+            (&mut white_pixel, TextureColor::White),
         ];
         canvas
             .with_multiple_texture_canvas(textures.iter(), |texture_canvas, user_context| {
@@ -46,28 +44,6 @@ fn dummy_texture<'a>(
                                         .expect("could not draw point");
                                 }
                                 if (i + j * 2) % 9 == 0 {
-                                    texture_canvas.set_draw_color(Color::RGB(0, 0, 0));
-                                    texture_canvas
-                                        .draw_point(Point::new(i as i32, j as i32))
-                                        .expect("could not draw point");
-                                }
-                            }
-                        }
-                    }
-                    TextureColor::Black => {
-                        for i in 0..PIXEL_SIZE {
-                            for j in 0..PIXEL_SIZE {
-                                // drawing pixel by pixel isn't very effective, but we only do it once and store
-                                // the texture afterwards so it's still alright!
-                                if (i + j) % 7 == 0 {
-                                    // this doesn't mean anything, there was some trial and error to find
-                                    // something that wasn't too ugly
-                                    texture_canvas.set_draw_color(Color::RGB(127, 127, 127));
-                                    texture_canvas
-                                        .draw_point(Point::new(i as i32, j as i32))
-                                        .expect("could not draw point");
-                                }
-                                if (i + j * 2) % 5 == 0 {
                                     texture_canvas.set_draw_color(Color::RGB(0, 0, 0));
                                     texture_canvas
                                         .draw_point(Point::new(i as i32, j as i32))
@@ -100,10 +76,18 @@ fn dummy_texture<'a>(
             })
             .map_err(|e| e.to_string())?;
     }
-    Ok((square_texture1, square_texture2))
+    Ok(white_pixel)
 }
 
 pub fn main() -> Result<(), String> {
+    let args: Vec<String> = env::args().collect();
+    let mut filename : String;
+    match args.iter().skip(1).next() {
+        Some(_filename) => filename = String::from(_filename),
+        None => return Err(String::from("need a filename"))
+    }
+    let program = std::fs::read(&filename).map_err(|e| e.to_string())?;
+
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
@@ -144,12 +128,13 @@ pub fn main() -> Result<(), String> {
     let texture_creator: TextureCreator<_> = canvas.texture_creator();
 
     // Create a "target" texture so that we can use our Renderer with it later
-    let (square_texture1, square_texture2) = dummy_texture(&mut canvas, &texture_creator)?;
+    let white_pixel = dummy_texture(&mut canvas, &texture_creator)?;
 
     let mut event_pump = sdl_context.event_pump()?;
     let mut frame: u32 = 0;
 
     let mut emulator = Emulator::new();
+    emulator.load_program(&program).map_err(|e| format!("error loading program"))?;
     let mut keypad : [bool; NUM_KEYS] = [false; NUM_KEYS];
 
     'running: loop {
@@ -166,7 +151,10 @@ pub fn main() -> Result<(), String> {
                     repeat: false,
                     ..
                 } => {
-                    todo!()
+                    println!("program_counter: {}", emulator.program_counter);
+                    println!("opcode: {}", emulator.get_opcode()
+                             .map_err(|e| format!("couldn't retrieve opcode"))?.to_str());
+                    emulator.tick(&keypad).map_err(|e| format!("error on tick: {:?}", e))?;
                 }
                 Event::MouseButtonDown {
                     x,
@@ -182,7 +170,7 @@ pub fn main() -> Result<(), String> {
 
         // update the game loop here
         if frame >= 60 {
-            emulator.tick(&keypad).map_err(|e| format!("error on tick: {:?}", e))?;
+            // emulator.tick(&keypad).map_err(|e| format!("error on tick: {:?}", e))?;
             frame = 0;
         }
 
@@ -195,16 +183,18 @@ pub fn main() -> Result<(), String> {
             .enumerate()
             .try_for_each(|(index, pixel)| -> Result<(), String> {
                 let i = index as u32;
-                canvas.copy(
-                    &square_texture1,
-                    None,
-                    Rect::new(
-                        ((i % DISPLAY_WIDTH as u32) * PIXEL_SIZE) as i32,
-                        ((i / DISPLAY_HEIGHT as u32) * PIXEL_SIZE) as i32,
-                        PIXEL_SIZE,
-                        PIXEL_SIZE,
-                    )
-                )?;
+                if *pixel {
+                    canvas.copy(
+                        &white_pixel,
+                        None,
+                        Rect::new(
+                            ((i % DISPLAY_WIDTH as u32) * PIXEL_SIZE) as i32,
+                            ((i / DISPLAY_HEIGHT as u32) * PIXEL_SIZE) as i32,
+                            PIXEL_SIZE,
+                            PIXEL_SIZE,
+                        )
+                    )?;
+                }
                 Ok(())
             })?; 
         canvas.present();

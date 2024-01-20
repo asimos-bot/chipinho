@@ -102,7 +102,7 @@ impl Emulator {
             .cloned()
             .ok_or_else(|| Error::OutOfBoundsMemoryAccess(self.program_counter))?;
 
-        let raw_opcode = ((first_byte as u16) << 8) & (second_byte as u16);
+        let raw_opcode = ((first_byte as u16) << 8) | (second_byte as u16);
         Instruction::parse(raw_opcode)
     }
 
@@ -114,7 +114,7 @@ impl Emulator {
             } else {
                 return Ok(());
             },
-            None => return Ok(()),
+            None => {},
         };
         let opcode : Instruction = self.get_opcode()?;
         self.run_opcode(opcode, &keypad);
@@ -136,7 +136,7 @@ impl Emulator {
                 self.vram
                     .iter_mut()
                     .for_each(|pixel| *pixel = false);
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op00EE => {
                 self.program_counter = self.stack[self.stack_size as usize];
@@ -152,91 +152,91 @@ impl Emulator {
             },
             Instruction::Op3xkk(register_index, value) => {
                 if self.registers[register_index as usize] as u16 == value {
-                    self.program_counter += 2;
+                    self.program_counter += 4;
                 }
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op4xkk(register_index, value) => {
                 if self.registers[register_index as usize] as u16 != value {
-                    self.program_counter += 2;
+                    self.program_counter += 4;
                 }
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op5xy0(register_index1, register_index2) => {
                 if self.registers[register_index1 as usize] == self.registers[register_index2 as usize] {
-                    self.program_counter += 2;
+                    self.program_counter += 4;
                 }
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op6xkk(register_index, value) => {
                 self.registers[register_index as usize] = value as u8;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op7xkk(register_index, value) => {
                 self.registers[register_index as usize] += value as u8;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xy0(register_index1, register_index2) => {
                 self.registers[register_index1 as usize] = self.registers[register_index2 as usize];
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xy1(register_index1, register_index2) => {
                 self.registers[register_index1 as usize] |= self.registers[register_index2 as usize];
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xy2(register_index1, register_index2) => {
                 self.registers[register_index1 as usize] &= self.registers[register_index2 as usize];
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xy3(register_index1, register_index2) => {
                 self.registers[register_index1 as usize] ^= self.registers[register_index2 as usize];
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xy4(register_index1, register_index2) => {
                 let result : u16 = self.registers[register_index1 as usize] as u16 + self.registers[register_index2 as usize] as u16;
                 self.registers[NUM_REGISTERS - 1] = if result > 255 { 1 } else { 0 };
                 self.registers[register_index1 as usize] = result as u8;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xy5(register_index1, register_index2) => {
                 let result : u16 = self.registers[register_index1 as usize] as u16 - self.registers[register_index2 as usize] as u16;
                 self.registers[NUM_REGISTERS - 1] = if self.registers[register_index1 as usize] > self.registers[register_index2 as usize] { 1 } else { 0 };
                 self.registers[register_index1 as usize] = result as u8;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xy6(register_index1, register_index2) => {
                 self.registers[NUM_REGISTERS - 1] = if self.registers[register_index2 as usize] & 0x1 > 0 { 1 } else { 0 };
                 self.registers[register_index2 as usize] = self.registers[register_index1 as usize] >> 1;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xy7(register_index1, register_index2) => {
                 let result : u16 = self.registers[register_index2 as usize] as u16 - self.registers[register_index1 as usize] as u16;
                 self.registers[NUM_REGISTERS - 1] = if self.registers[register_index2 as usize] > self.registers[register_index1 as usize] { 1 } else { 0 };
                 self.registers[register_index1 as usize] = result as u8;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op8xyE(register_index1, register_index2) => {
                 self.registers[NUM_REGISTERS - 1] = if self.registers[register_index1 as usize] & 0b1000_0000 > 0 { 1 } else { 0 };
                 self.registers[register_index2 as usize] = self.registers[register_index1 as usize] << 1;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::Op9xy0(register_index1, register_index2) => {
                 if self.registers[register_index1 as usize] != self.registers[register_index2 as usize] {
-                    self.program_counter += 2;
+                    self.program_counter += 4;
                 }
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpAnnn(addr) => {
                 self.index = addr as u16;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpBnnn(addr) => {
                 self.index = addr as u16 + self.registers[0] as u16;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpCxkk(register_index, value) => {
                 self.registers[register_index as usize] = self.get_random_u8() & value as u8;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpDxyn(x, y, value) => {
                 let x_wrapped = x + 8 % DISPLAY_WIDTH;
@@ -274,44 +274,44 @@ impl Emulator {
                         }
                         *vram_bit = *vram_bit != memory_bit;
                     });
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpEx9E(register_index) => {
                 if keypad[self.registers[register_index as usize] as usize] {
-                    self.program_counter += 2;
+                    self.program_counter += 4;
                 }
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpExA1(register_index) => {
                 if !keypad[self.registers[register_index as usize] as usize] {
-                    self.program_counter += 2;
+                    self.program_counter += 4;
                 }
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx07(register_index) => {
                 self.registers[register_index as usize] = self.delay_timer;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx0A(register_index) => {
                 self.waiting_for_key = Some(self.registers[register_index as usize] as usize);
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx15(register_index) => {
                 self.delay_timer = self.registers[register_index as usize];
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx18(register_index) => {
                 self.sound_timer = self.registers[register_index as usize];
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx1E(register_index) => {
                 self.index = self.index + self.registers[register_index as usize] as u16;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx29(register_index) => {
                 let value : usize = (self.registers[register_index as usize] & 0x0F) as usize;
                 self.index = (FONT_SET.len() + value * FONT_SIZE) as u16;
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx33(register_index) => {
                 let mut value = self.registers[register_index as usize];
@@ -328,7 +328,7 @@ impl Emulator {
                     .for_each(|(byte, digit)| {
                         *byte = digit;
                     });
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx55(register_index) => {
                 self.memory
@@ -339,7 +339,7 @@ impl Emulator {
                     .for_each(|(byte, register)| {
                         *byte = register
                     });
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
             Instruction::OpFx65(register_index) => {
                 self.memory
@@ -350,7 +350,7 @@ impl Emulator {
                     .for_each(|(byte, register)| {
                         *register = *byte;
                     });
-                self.program_counter += 1;
+                self.program_counter += 2;
             },
         }
     }
