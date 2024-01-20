@@ -1,12 +1,10 @@
-use alloc::vec::{Vec, self};
+#[cfg(target_arch="wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::constants::{NUM_REGISTERS, MAX_STACK_SIZE, MEMORY_SIZE, DISPLAY_WIDTH, DISPLAY_HEIGHT, PROGRAM_BEGIN_ADDR, FONT_BEGIN_ADDR, RANDOM_MULTIPLIER, RANDOM_MODULE, RANDOM_INCREMENT, NUM_KEYS};
-use crate::{instruction::Instruction, error::Error};
-use crate::font::{FONT_SET, FONT_SIZE};
-use core::alloc::GlobalAlloc;
-use core::mem;
+use crate::{constants::*, error::Error, instruction::Instruction, font::{FONT_SET, FONT_SIZE}};
 
-#[repr(C)]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(not(target_arch="wasm32"), repr(C))]
 pub struct Emulator {
     pub program_counter: u16,
     pub index: u16,
@@ -21,16 +19,11 @@ pub struct Emulator {
     pub vram: [bool; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
 }
 
-pub const EMULATOR_SIZE : usize = mem::size_of::<Emulator>();
-
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 impl Emulator {
-    #[no_mangle]
-    pub extern "C" fn get_emulator_size() -> usize {
-        EMULATOR_SIZE
-    }
 
-    #[no_mangle]
-    pub extern "C" fn new() -> Self {
+    #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
+    pub fn new() -> Self {
         let mut emulator = Emulator {
             program_counter: PROGRAM_BEGIN_ADDR,
             index: 0,
@@ -54,7 +47,7 @@ impl Emulator {
         emulator
     }
 
-    #[no_mangle]
+    #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
     pub extern "C" fn get_memory_ptr(&self) -> *const u8 {
         let u8_slice: &[u8] = unsafe {
             core::slice::from_raw_parts(self.memory.as_ptr() as *const u8, self.memory.len())
@@ -62,7 +55,7 @@ impl Emulator {
         u8_slice.as_ptr()
     }
 
-    #[no_mangle]
+    #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
     pub extern "C" fn get_vram_ptr(&self) -> *const u8 {
        // Convert the bool slice to a u8 slice
         let u8_slice: &[u8] = unsafe {
@@ -73,93 +66,12 @@ impl Emulator {
         u8_slice.as_ptr()
     }
 
-    #[no_mangle]
-    pub extern "C" fn get_program_counter(&self) -> u16 {
-        self.program_counter
-    }
-    #[no_mangle]
-    pub extern "C" fn set_program_counter(&mut self, program_counter: u16) {
-        self.program_counter = program_counter;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_index(&self) -> u16 {
-        self.index
-    }
-    #[no_mangle]
-    pub extern "C" fn set_index(&mut self, index: u16) {
-        self.index = index;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_delay_timer(&self) -> u8 {
-        self.delay_timer
-    }
-    #[no_mangle]
-    pub extern "C" fn set_delay_timer(&mut self, delay_timer: u8) {
-        self.delay_timer = delay_timer;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_sound_timer(&self) -> u8 {
-        self.sound_timer
-    }
-    #[no_mangle]
-    pub extern "C" fn set_sound_timer(&mut self, sound_timer: u8) {
-        self.sound_timer = sound_timer;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_waiting_for_key(&self) -> Option<usize> {
-        self.waiting_for_key
-    }
-    #[no_mangle]
-    pub extern "C" fn set_waiting_for_key(&mut self, waiting_for_key: Option<usize>) {
-        self.waiting_for_key = waiting_for_key;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_last_random_u8(&self) -> u8 {
-        self.last_random_u8
-    }
-    #[no_mangle]
-    pub extern "C" fn get_set_last_random_u8(&mut self, last_random_u8: u8) {
-        self.last_random_u8 = last_random_u8;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_stack_size(&self) -> u16 {
-        self.stack_size
-    }
-    #[no_mangle]
-    pub extern "C" fn set_stack_size(&mut self, stack_size: u16) {
-        self.stack_size = stack_size;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_registers(&self) -> [u8; NUM_REGISTERS] {
-        self.registers
-    }
-    #[no_mangle]
-    pub extern "C" fn set_registers(&mut self, registers: &[u8; NUM_REGISTERS]) {
-        self.registers = registers.clone();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_stack(&self) -> [u16; MAX_STACK_SIZE] {
-        self.stack
-    }
-    #[no_mangle]
-    pub extern "C" fn set_stack(&mut self, stack: &[u16; MAX_STACK_SIZE]) {
-        self.stack = stack.clone();
-    }
-    
-    #[no_mangle]
+    #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
     pub extern "C" fn should_beep(&self) -> bool {
         self.sound_timer > 0
     }
 
-    #[no_mangle]
+    #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
     pub extern "C" fn load_program(&mut self, program: &[u8]) -> Result<(), Error> {
         let max_program_length = (self.memory.len() as u16) - PROGRAM_BEGIN_ADDR;
         if (program.len() as u16) > max_program_length {
@@ -179,7 +91,7 @@ impl Emulator {
         self.last_random_u8
     }
 
-    #[no_mangle]
+    #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
     pub fn get_opcode(&self) -> Result<Instruction, Error> {
         let first_byte : u8 = self.memory
             .get(self.program_counter as usize)
@@ -194,7 +106,7 @@ impl Emulator {
         Instruction::parse(raw_opcode)
     }
 
-    #[no_mangle]
+    #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
     pub extern "C" fn tick(&mut self, keypad: &[bool]) -> Result<(), Error> {
         match self.waiting_for_key {
             Some(key_index) => if keypad[key_index] {
@@ -442,32 +354,4 @@ impl Emulator {
             },
         }
     }
-}
-
-mod math {
-    mod math_js {
-        #[link(wasm_import_module = "Math")]
-        extern "C" {
-            #[link_name = "random"]
-            pub fn random() -> f64;
-        }
-    }
-    pub fn random() -> f64 {
-        unsafe { math_js::random() }
-    }
-}
-
-
-#[export_name = "add"]
-#[no_mangle]
-pub extern "C" fn add(left: f64, right: f64) -> f64 {
-    left + right + math::random()
-}
-
-#[no_mangle]
-pub extern "C" fn alloc(len: usize) -> *const u8 {
-    let data: Vec<u8> = Vec::with_capacity(len);
-    let raw_ptr = data.as_ptr();
-    core::mem::forget(data);
-    raw_ptr
 }

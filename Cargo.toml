@@ -1,22 +1,4 @@
-[package]
-name = "chipinho"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-crate-type = ["cdylib"]
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-strip = "debuginfo"
-# opt-level = 'z'
-# lto = true
-# wasm-opt = true
-
-[build]
-target = "wasm32-unknown-unknown"
+[workspace]
+members = ["chipinho", "examples/*"]
+default-members = ["chipinho"]
+resolver = "2"

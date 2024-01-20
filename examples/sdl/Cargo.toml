@@ -1,0 +1,11 @@
+[package]
+name = "example-sdl"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sdl2 = "0.36.0"
+chipinho = { path = "../../chipinho/" }
