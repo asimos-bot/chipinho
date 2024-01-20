@@ -115,7 +115,6 @@ pub fn main() -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    println!("Using SDL_Renderer \"{}\"", canvas.info().name);
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     // clears the canvas with the color we set in `set_draw_color`.
     canvas.clear();
@@ -152,23 +151,152 @@ pub fn main() -> Result<(), String> {
                     repeat: false,
                     ..
                 } => {
-                }
+                },
                 Event::MouseButtonDown {
                     x,
                     y,
                     mouse_btn: MouseButton::Left,
                     ..
                 } => {
-                    todo!()
-                }
+                },
+                Event::KeyDown { 
+                    keycode: Some(Keycode::Num1),
+                    repeat: true,
+                    ..
+                } => keypad[0x01] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::Num2),
+                    ..
+                } => keypad[0x02] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::Num3),
+                    ..
+                } => keypad[0x03] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::Num4),
+                    ..
+                } => keypad[0x0C] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::Q),
+                    ..
+                } => keypad[0x04] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::W),
+                    ..
+                } => keypad[0x05] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::E),
+                    ..
+                } => keypad[0x06] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::R),
+                    ..
+                } => keypad[0x0D] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::A),
+                    ..
+                } => keypad[0x07] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::S),
+                    ..
+                } => keypad[0x08] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::D),
+                    ..
+                } => keypad[0x09] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::F),
+                    ..
+                } => keypad[0x0E] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::Z),
+                    ..
+                } => keypad[0x0A] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::X),
+                    ..
+                } => keypad[0x00] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::C),
+                    ..
+                } => keypad[0x0B] = true,
+                Event::KeyDown { 
+                    keycode: Some(Keycode::V),
+                    ..
+                } => keypad[0x0F] = true,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::Num1),
+                    repeat: false,
+                    ..
+                } => keypad[0x01] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::Num2),
+                    ..
+                } => keypad[0x02] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::Num3),
+                    ..
+                } => keypad[0x03] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::Num4),
+                    ..
+                } => keypad[0x0C] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::Q),
+                    ..
+                } => keypad[0x04] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::W),
+                    ..
+                } => keypad[0x05] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::E),
+                    ..
+                } => keypad[0x06] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::R),
+                    ..
+                } => keypad[0x0D] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::A),
+                    ..
+                } => keypad[0x07] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::S),
+                    ..
+                } => keypad[0x08] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::D),
+                    ..
+                } => keypad[0x09] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::F),
+                    ..
+                } => keypad[0x0E] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::Z),
+                    ..
+                } => keypad[0x0A] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::X),
+                    ..
+                } => keypad[0x00] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::C),
+                    ..
+                } => keypad[0x0B] = false,
+                Event::KeyUp { 
+                    keycode: Some(Keycode::V),
+                    ..
+                } => keypad[0x0F] = false,
                 _ => {}
             }
         }
-
         // update the game loop here
         if (Instant::now() - start).as_millis() >= 16 {
             // println!("opcode: {}", emulator.get_opcode().map_err(|e| format!("error getting opcode"))?.to_str());
             emulator.tick(&keypad).map_err(|e| format!("error on tick: {:?}", e))?;
+            start = Instant::now();
         }
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));

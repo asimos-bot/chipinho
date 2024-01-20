@@ -109,7 +109,7 @@ impl Emulator {
     #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
     pub extern "C" fn tick(&mut self, keypad: &[bool]) -> Result<(), Error> {
         match self.waiting_for_key {
-            Some(key_index) => if keypad[key_index] {
+            Some(key_index) => if keypad[key_index % 16] {
                 self.waiting_for_key = None;
             } else {
                 return Ok(());
@@ -182,42 +182,49 @@ impl Emulator {
             },
             Instruction::Op8xy1(register_index1, register_index2) => {
                 self.registers[register_index1 as usize] |= self.registers[register_index2 as usize];
+                self.registers[NUM_REGISTERS - 1] = 0;
                 self.program_counter += 2;
             },
             Instruction::Op8xy2(register_index1, register_index2) => {
                 self.registers[register_index1 as usize] &= self.registers[register_index2 as usize];
+                self.registers[NUM_REGISTERS - 1] = 0;
                 self.program_counter += 2;
             },
             Instruction::Op8xy3(register_index1, register_index2) => {
                 self.registers[register_index1 as usize] ^= self.registers[register_index2 as usize];
+                self.registers[NUM_REGISTERS - 1] = 0;
                 self.program_counter += 2;
             },
             Instruction::Op8xy4(register_index1, register_index2) => {
                 let result : u16 = self.registers[register_index1 as usize] as u16 + self.registers[register_index2 as usize] as u16;
-                self.registers[NUM_REGISTERS - 1] = if result > 255 { 1 } else { 0 };
                 self.registers[register_index1 as usize] = result as u8;
+                self.registers[NUM_REGISTERS - 1] = if result > 255 { 1 } else { 0 };
                 self.program_counter += 2;
             },
             Instruction::Op8xy5(register_index1, register_index2) => {
+                let set_vf = if self.registers[register_index1 as usize] > self.registers[register_index2 as usize] { 1 } else { 0 };
                 let result : u8 = self.registers[register_index1 as usize].wrapping_sub(self.registers[register_index2 as usize]);
-                self.registers[NUM_REGISTERS - 1] = if self.registers[register_index1 as usize] > self.registers[register_index2 as usize] { 1 } else { 0 };
                 self.registers[register_index1 as usize] = result;
+                self.registers[NUM_REGISTERS - 1] = set_vf;
                 self.program_counter += 2;
             },
             Instruction::Op8xy6(register_index1, register_index2) => {
-                self.registers[NUM_REGISTERS - 1] = if self.registers[register_index2 as usize] & 0x1 > 0 { 1 } else { 0 };
-                self.registers[register_index2 as usize] = self.registers[register_index1 as usize] >> 1;
+                let set_vf = if self.registers[register_index2 as usize] & 0x1 > 0 { 1 } else { 0 };
+                self.registers[register_index1 as usize] = self.registers[register_index2 as usize] >> 1;
+                self.registers[NUM_REGISTERS - 1] = set_vf;
                 self.program_counter += 2;
             },
             Instruction::Op8xy7(register_index1, register_index2) => {
+                let set_vf = if self.registers[register_index2 as usize] > self.registers[register_index1 as usize] { 1 } else { 0 };
                 let result : u8 = self.registers[register_index2 as usize].wrapping_sub(self.registers[register_index1 as usize]);
-                self.registers[NUM_REGISTERS - 1] = if self.registers[register_index2 as usize] > self.registers[register_index1 as usize] { 1 } else { 0 };
                 self.registers[register_index1 as usize] = result;
+                self.registers[NUM_REGISTERS - 1] = set_vf;
                 self.program_counter += 2;
             },
             Instruction::Op8xyE(register_index1, register_index2) => {
-                self.registers[NUM_REGISTERS - 1] = if self.registers[register_index1 as usize] & 0b1000_0000 > 0 { 1 } else { 0 };
-                self.registers[register_index2 as usize] = self.registers[register_index1 as usize] << 1;
+                let set_vf = if self.registers[register_index2 as usize] & 0b1000_0000 > 0 { 1 } else { 0 };
+                self.registers[register_index1 as usize] = self.registers[register_index2 as usize] << 1;
+                self.registers[NUM_REGISTERS - 1] = set_vf;
                 self.program_counter += 2;
             },
             Instruction::Op9xy0(register_index1, register_index2) => {
@@ -241,41 +248,18 @@ impl Emulator {
             Instruction::OpDxyn(register_index1, register_index2, value) => {
                 let x = self.registers[register_index1 as usize];
                 let y = self.registers[register_index2 as usize];
-                let x_wrapped = if x + 8 >= DISPLAY_WIDTH { (x + 8) as usize % DISPLAY_WIDTH as usize } else { 0 };
-                let y_wrapped = if y + value >= DISPLAY_HEIGHT { (y + value) as usize % DISPLAY_HEIGHT as usize } else { 0 };
                 self.registers[NUM_REGISTERS - 1] = 0;
-                self.memory
-                    .iter()
-                    .skip(self.index as usize)
-                    .take(value as usize)
-                    // turn memory in iter of bools (bits)
-                    .flat_map(|byte| 
-                        (0..8)
-                            .into_iter()
-                            .map(move |index| (byte & (0b1000_0000 >> index)) != 0)
-                    )
-                    .zip(
-                        // get section of vram we will draw at
-                        self.vram
-                            .iter_mut()
-                            .enumerate()
-                            .filter_map(|(index, pixel)| {
-                                let px = index % DISPLAY_WIDTH as usize;
-                                let py = index / DISPLAY_WIDTH as usize;
-                                let x_is_valid = px < x_wrapped || (px >= x as usize && px < (x + 8) as usize);
-                                let y_is_valid = py < y_wrapped || (py >= y as usize && py < (y + value) as usize);
-                                if x_is_valid && y_is_valid {
-                                    return Some(pixel);
-                                }
-                                None
-                            })
-                    )
-                    .for_each(|(memory_bit, vram_pixel)| {
-                        if *vram_pixel == memory_bit && *vram_pixel {
-                            self.registers[NUM_REGISTERS - 1] = 1;
-                        }
-                        *vram_pixel = *vram_pixel != memory_bit;
-                    });
+                for byte in 0..value {
+                    let py = (y as usize + byte as usize) % DISPLAY_HEIGHT as usize;
+                    for bit in 0..8 {
+                        let px = (x as usize + bit) % DISPLAY_WIDTH as usize;
+                        let color = (self.memory[self.index as usize + byte as usize] >> (7 - bit)) & 1;
+                        let pixel = &mut self.vram[py as usize * DISPLAY_WIDTH as usize + px as usize];
+                        self.registers[NUM_REGISTERS - 1] |= color & (*pixel) as u8;
+                        *pixel ^= color != 0;
+
+                    }
+                }
                 self.program_counter += 2;
             },
             Instruction::OpEx9E(register_index) => {
@@ -340,6 +324,7 @@ impl Emulator {
                     .for_each(|(byte, register)| {
                         *byte = *register
                     });
+                self.index += register_index as u16;
                 self.program_counter += 2;
             },
             Instruction::OpFx65(register_index) => {
@@ -354,6 +339,7 @@ impl Emulator {
                     .for_each(|(byte, register)| {
                         *register = *byte;
                     });
+                self.index += register_index as u16;
                 self.program_counter += 2;
             },
         }
