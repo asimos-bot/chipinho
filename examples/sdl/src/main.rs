@@ -5,6 +5,7 @@ use std::time::Instant;
 use chipinho::constants::{DISPLAY_WIDTH, DISPLAY_HEIGHT, NUM_KEYS};
 
 use chipinho::emulator::Emulator;
+use sdl2::audio::{AudioCallback, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
@@ -54,30 +55,33 @@ fn dummy_texture<'a>(
                         }
                     }
                 };
-                // for i in 0..PIXEL_SIZE {
-                //     for j in 0..PIXEL_SIZE {
-                //         // drawing pixel by pixel isn't very effective, but we only do it once and store
-                //         // the texture afterwards so it's still alright!
-                //         if (i + j) % 7 == 0 {
-                //             // this doesn't mean anything, there was some trial and serror to find
-                //             // something that wasn't too ugly
-                //             texture_canvas.set_draw_color(Color::RGB(255, 255, 255));
-                //             texture_canvas
-                //                 .draw_point(Point::new(i as i32, j as i32))
-                //                 .expect("could not draw point");
-                //         }
-                //         if (i + j * 2) % 5 == 0 {
-                //             texture_canvas.set_draw_color(Color::RGB(127, 127, 127));
-                //             texture_canvas
-                //                 .draw_point(Point::new(i as i32, j as i32))
-                //                 .expect("could not draw point");
-                //         }
-                //     }
-                // }
             })
             .map_err(|e| e.to_string())?;
     }
     Ok(white_pixel)
+}
+
+
+struct SquareWave {
+    phase_inc: f32,
+    phase: f32,
+    volume: f32,
+}
+
+impl AudioCallback for SquareWave {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [f32]) {
+        // Generate a square wave
+        for x in out.iter_mut() {
+            *x = if self.phase <= 0.5 {
+                self.volume
+            } else {
+                -self.volume
+            };
+            self.phase = (self.phase + self.phase_inc) % 1.0;
+        }
+    }
 }
 
 pub fn main() -> Result<(), String> {
@@ -91,6 +95,21 @@ pub fn main() -> Result<(), String> {
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
+    let audio_subsystem = sdl_context.audio()?;
+
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44_100),
+        channels: Some(1),
+        samples: None
+    };
+
+    let audio_device = audio_subsystem.open_playback(None, &desired_spec, |spec| {
+        SquareWave {
+            phase_inc: 440.0 / spec.freq as f32,
+            phase: 0.0,
+            volume: 0.25
+        }
+    })?;
 
     // the window is the representation of a window in your operating system,
     // however you can only manipulate properties of that window, like its size, whether it's
@@ -299,6 +318,9 @@ pub fn main() -> Result<(), String> {
             start = Instant::now();
         }
 
+        if emulator.should_beep() {
+            audio_device.resume();
+        }
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
         // iterate over pixels and get which color to print each square
@@ -325,6 +347,9 @@ pub fn main() -> Result<(), String> {
                 Ok(())
             })?; 
         canvas.present();
+        if !emulator.should_beep() {
+            audio_device.pause();
+        }
     }
 
     Ok(())
