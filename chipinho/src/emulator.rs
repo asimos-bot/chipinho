@@ -202,7 +202,7 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::Op8xy5(register_index1, register_index2) => {
-                let set_vf = if self.registers[register_index1 as usize] > self.registers[register_index2 as usize] { 1 } else { 0 };
+                let set_vf = if self.registers[register_index1 as usize] >= self.registers[register_index2 as usize] { 1 } else { 0 };
                 let result : u8 = self.registers[register_index1 as usize].wrapping_sub(self.registers[register_index2 as usize]);
                 self.registers[register_index1 as usize] = result;
                 self.registers[NUM_REGISTERS - 1] = set_vf;
@@ -215,7 +215,7 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::Op8xy7(register_index1, register_index2) => {
-                let set_vf = if self.registers[register_index2 as usize] > self.registers[register_index1 as usize] { 1 } else { 0 };
+                let set_vf = if self.registers[register_index2 as usize] >= self.registers[register_index1 as usize] { 1 } else { 0 };
                 let result : u8 = self.registers[register_index2 as usize].wrapping_sub(self.registers[register_index1 as usize]);
                 self.registers[register_index1 as usize] = result;
                 self.registers[NUM_REGISTERS - 1] = set_vf;
@@ -246,12 +246,15 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::OpDxyn(register_index1, register_index2, value) => {
-                let x = self.registers[register_index1 as usize];
-                let y = self.registers[register_index2 as usize];
+                let x = self.registers[register_index1 as usize] % DISPLAY_WIDTH;
+                let y = self.registers[register_index2 as usize] % DISPLAY_HEIGHT;
                 self.registers[NUM_REGISTERS - 1] = 0;
+                println!("{} {}", DISPLAY_HEIGHT, y);
+                let value = if y + value < DISPLAY_HEIGHT { value as usize } else { DISPLAY_HEIGHT as usize - y as usize };
+                let max_bit = if x + 8 < DISPLAY_WIDTH { 8 } else { DISPLAY_WIDTH as usize - x as usize };
                 for byte in 0..value {
                     let py = (y as usize + byte as usize) % DISPLAY_HEIGHT as usize;
-                    for bit in 0..8 {
+                    for bit in 0..max_bit as usize {
                         let px = (x as usize + bit) % DISPLAY_WIDTH as usize;
                         let color = (self.memory[self.index as usize + byte as usize] >> (7 - bit)) & 1;
                         let pixel = &mut self.vram[py as usize * DISPLAY_WIDTH as usize + px as usize];
@@ -300,8 +303,8 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::OpFx33(register_index) => {
-                let mut value = self.registers[register_index as usize];
-                let mut digits : [u8; 3] = [value / 100, (value % 100) / 10, value % 10];
+                let value = self.registers[register_index as usize];
+                let digits : [u8; 3] = [value / 100, (value % 100) / 10, value % 10];
                 self.memory
                     .iter_mut()
                     .skip(self.index as usize)
@@ -324,7 +327,7 @@ impl Emulator {
                     .for_each(|(byte, register)| {
                         *byte = *register
                     });
-                self.index += register_index as u16;
+                self.index += register_index as u16 + 1;
                 self.program_counter += 2;
             },
             Instruction::OpFx65(register_index) => {
@@ -339,7 +342,7 @@ impl Emulator {
                     .for_each(|(byte, register)| {
                         *register = *byte;
                     });
-                self.index += register_index as u16;
+                self.index += register_index as u16 + 1;
                 self.program_counter += 2;
             },
         }
