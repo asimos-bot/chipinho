@@ -238,8 +238,7 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::OpBnnn(addr) => {
-                self.index = addr as u16 + self.registers[0] as u16;
-                self.program_counter += 2;
+                self.program_counter = addr as u16 + self.registers[0] as u16;
             },
             Instruction::OpCxkk(register_index, value) => {
                 self.registers[register_index as usize] = self.get_random_u8() & value as u8;
