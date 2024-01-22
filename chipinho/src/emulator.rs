@@ -10,7 +10,7 @@ pub struct Emulator {
     pub index: u16,
     pub delay_timer: u8,
     pub sound_timer: u8,
-    pub waiting_for_key: Option<usize>,
+    pub waiting_for_key: Option<(usize, usize, bool)>,
     pub last_random_u8: u8,
     pub stack_size: u16,
     pub registers: [u8; NUM_REGISTERS],
@@ -108,22 +108,28 @@ impl Emulator {
 
     #[cfg_attr(not(target_arch="wasm32"), no_mangle)]
     pub extern "C" fn tick(&mut self, keypad: &[bool]) -> Result<(), Error> {
-        match self.waiting_for_key {
-            Some(key_index) => if keypad[key_index % 16] {
-                self.waiting_for_key = None;
-            } else {
-                return Ok(());
-            },
-            None => {},
-        };
-        let opcode : Instruction = self.get_opcode()?;
-        self.run_opcode(opcode, &keypad);
+        // update timers (even if blocking for keypress)
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
         }
         if self.sound_timer > 0 {
             self.sound_timer -= 1;
         }
+
+        match self.waiting_for_key {
+            Some((register_index, _, false)) => if let Some(key_index) = keypad.iter().take(NUM_KEYS).position(|pressed| *pressed) {
+                self.waiting_for_key = Some((register_index, key_index, true));
+                return Ok(())
+            },
+            Some((register_index, key_index, true)) => if !keypad[key_index] {
+                self.registers[register_index] = key_index as u8;
+                self.program_counter += 2;
+                self.waiting_for_key = None;
+            },
+            None => {},
+        };
+        let opcode : Instruction = self.get_opcode()?;
+        self.run_opcode(opcode, &keypad);
         Ok(())
     }
 
@@ -248,7 +254,6 @@ impl Emulator {
                 let x = self.registers[register_index1 as usize] % DISPLAY_WIDTH;
                 let y = self.registers[register_index2 as usize] % DISPLAY_HEIGHT;
                 self.registers[NUM_REGISTERS - 1] = 0;
-                println!("{} {}", DISPLAY_HEIGHT, y);
                 let value = if y + value < DISPLAY_HEIGHT { value as usize } else { DISPLAY_HEIGHT as usize - y as usize };
                 let max_bit = if x + 8 < DISPLAY_WIDTH { 8 } else { DISPLAY_WIDTH as usize - x as usize };
                 for byte in 0..value {
@@ -281,8 +286,7 @@ impl Emulator {
                 self.program_counter += 2;
             },
             Instruction::OpFx0A(register_index) => {
-                self.waiting_for_key = Some(self.registers[register_index as usize] as usize);
-                self.program_counter += 2;
+                self.waiting_for_key = Some((register_index as usize, 0, false));
             },
             Instruction::OpFx15(register_index) => {
                 self.delay_timer = self.registers[register_index as usize];
