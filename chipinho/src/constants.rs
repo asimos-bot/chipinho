@@ -9,4 +9,4 @@ pub const DISPLAY_WIDTH : u8 = 64;
 
 pub const RANDOM_MULTIPLIER : u8 = 42;
 pub const RANDOM_INCREMENT : u8 = 31;
-pub const RANDOM_MODULE : u8 = 13;
+pub const RANDOM_MODULE : u8 = 253;
