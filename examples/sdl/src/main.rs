@@ -4,6 +4,7 @@ use std::time::Instant;
 use chipinho::constants::{DISPLAY_HEIGHT, DISPLAY_WIDTH, NUM_KEYS};
 
 use chipinho::emulator::Emulator;
+use chipinho::error::Error;
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -84,9 +85,9 @@ pub fn main() -> Result<(), String> {
     let mut event_pump = sdl_context.event_pump()?;
 
     let mut emulator = Emulator::new();
-    emulator
-        .load_program(&program)
-        .map_err(|e| format!("error loading program"))?;
+    if emulator.load_program(&program) != 0 {
+        return Err(format!("error loading program"));
+    }
     let mut keypad: [bool; NUM_KEYS] = [false; NUM_KEYS];
     let mut start = Instant::now();
 
@@ -246,9 +247,11 @@ pub fn main() -> Result<(), String> {
         // update the game loop here
         if (Instant::now() - start).as_millis() >= 16 {
             // println!("opcode: {}", emulator.get_opcode().map_err(|e| format!("error getting opcode"))?.to_str());
-            emulator
-                .tick(&keypad)
-                .map_err(|e| format!("error on tick: {:?}", e))?;
+            let res = emulator.tick(&keypad);
+            if res != 0 {
+                let err : Error = res.into();
+                return Err(format!("error on tick: {:?}", err));
+            }
             start = Instant::now();
         }
 

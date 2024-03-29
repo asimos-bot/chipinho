@@ -77,10 +77,10 @@ impl Emulator {
     }
 
     #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
-    pub extern "C" fn load_program(&mut self, program: &[u8]) -> Result<(), Error> {
+    pub extern "C" fn load_program(&mut self, program: &[u8]) -> u32 {
         let max_program_length = (self.memory.len() as u16) - PROGRAM_BEGIN_ADDR;
         if (program.len() as u16) > max_program_length {
-            return Err(Error::NotEnoughMemoryForProgram);
+            return Error::NotEnoughMemoryForProgram.into();
         }
         self.memory
             .iter_mut() // grab memory mutably
@@ -88,7 +88,7 @@ impl Emulator {
             .take(program.len()) // truncate to program size
             .zip(program)
             .for_each(|(memory_byte, program_byte)| *memory_byte = *program_byte);
-        Ok(())
+        0
     }
 
     fn get_random_u8(&mut self) -> u8 {
@@ -99,8 +99,8 @@ impl Emulator {
         self.last_random_u8
     }
 
-    #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
-    pub fn get_opcode(&self) -> Result<Instruction, Error> {
+    // #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
+    fn get_opcode(&self) -> Result<Instruction, Error> {
         let first_byte: u8 = self
             .memory
             .get(self.program_counter as usize)
@@ -117,7 +117,7 @@ impl Emulator {
     }
 
     #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
-    pub extern "C" fn tick(&mut self, keypad: &[bool]) -> Result<(), Error> {
+    pub extern "C" fn tick(&mut self, keypad: &[bool]) -> u32 {
         // update timers (even if blocking for keypress)
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
@@ -130,7 +130,7 @@ impl Emulator {
             Some((register_index, _, false)) => {
                 if let Some(key_index) = keypad.iter().take(NUM_KEYS).position(|pressed| *pressed) {
                     self.waiting_for_key = Some((register_index, key_index, true));
-                    return Ok(());
+                    return 0;
                 }
             }
             Some((register_index, key_index, true)) => {
@@ -142,9 +142,13 @@ impl Emulator {
             }
             None => {}
         };
-        let opcode: Instruction = self.get_opcode()?;
-        self.run_opcode(opcode, &keypad);
-        Ok(())
+        match self.get_opcode() {
+            Ok(opcode) => {
+                self.run_opcode(opcode, &keypad);
+                0
+            },
+            Err(err) => err.into(),
+        }
     }
 
     fn run_opcode(&mut self, opcode: Instruction, keypad: &[bool]) -> () {

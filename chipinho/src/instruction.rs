@@ -1,11 +1,11 @@
 use crate::prelude::error::Error;
 
 pub enum Instruction {
-    Op0nnn(u32),
+    Op0nnn(u16),
     Op00E0,
     Op00EE,
-    Op1nnn(u32),
-    Op2nnn(u32),
+    Op1nnn(u16),
+    Op2nnn(u16),
     Op3xkk(u8, u16),
     Op4xkk(u8, u16),
     Op5xy0(u8, u8),
@@ -21,8 +21,8 @@ pub enum Instruction {
     Op8xy7(u8, u8),
     Op8xyE(u8, u8),
     Op9xy0(u8, u8),
-    OpAnnn(u32),
-    OpBnnn(u32),
+    OpAnnn(u16),
+    OpBnnn(u16),
     OpCxkk(u8, u16),
     OpDxyn(u8, u8, u8),
     OpEx9E(u8),
@@ -46,7 +46,7 @@ impl Instruction {
             (opcode & 0x00F0) >> 4 as u8,
             (opcode & 0x000F) as u8,
         );
-        let nnn = (opcode & 0x0FFF) as u32;
+        let nnn = (opcode & 0x0FFF) as u16;
         let kk = (opcode & 0x00FF) as u16;
         let x = nibbles.1 as u8;
         let y = nibbles.2 as u8;
