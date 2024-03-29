@@ -1,4 +1,4 @@
 [workspace]
-members = ["chipinho", "examples/*"]
+members = ["chipinho", "examples/sdl"]
 default-members = ["chipinho"]
 resolver = "2"
