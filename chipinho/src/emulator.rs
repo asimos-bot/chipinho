@@ -1,4 +1,4 @@
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
@@ -8,14 +8,22 @@ use crate::{
     instruction::Instruction,
 };
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-#[cfg_attr(not(target_arch = "wasm32"), repr(C))]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[cfg_attr(not(target_family = "wasm"), repr(C))]
+pub struct WaitingKey {
+    register_index: usize,
+    key_index: usize,
+    has_been_pressed: bool,
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
+#[cfg_attr(not(target_family = "wasm"), repr(C))]
 pub struct Emulator {
     pub program_counter: u16,
     pub index: u16,
     pub delay_timer: u8,
     pub sound_timer: u8,
-    pub waiting_for_key: Option<(usize, usize, bool)>,
+    pub waiting_key: Option<WaitingKey>,
     pub last_random_u8: u8,
     pub stack_size: u16,
     pub registers: [u8; NUM_REGISTERS],
@@ -24,16 +32,16 @@ pub struct Emulator {
     pub vram: [bool; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Emulator {
-    #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
+    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     pub fn new() -> Self {
         let mut emulator = Emulator {
             program_counter: PROGRAM_BEGIN_ADDR,
             index: 0,
             delay_timer: 0,
             sound_timer: 0,
-            waiting_for_key: None,
+            waiting_key: None,
             last_random_u8: 123,
             stack_size: 0,
             registers: [0; NUM_REGISTERS],
@@ -52,7 +60,7 @@ impl Emulator {
         emulator
     }
 
-    #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
+    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     pub extern "C" fn get_memory_ptr(&self) -> *const u8 {
         let u8_slice: &[u8] = unsafe {
             core::slice::from_raw_parts(self.memory.as_ptr() as *const u8, self.memory.len())
@@ -60,7 +68,7 @@ impl Emulator {
         u8_slice.as_ptr()
     }
 
-    #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
+    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     pub extern "C" fn get_vram_ptr(&self) -> *const u8 {
         // Convert the bool slice to a u8 slice
         let u8_slice: &[u8] = unsafe {
@@ -71,12 +79,12 @@ impl Emulator {
         u8_slice.as_ptr()
     }
 
-    #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
+    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     pub extern "C" fn should_beep(&self) -> bool {
         self.sound_timer > 0
     }
 
-    #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
+    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     pub extern "C" fn load_program(&mut self, program: &[u8]) -> u32 {
         let max_program_length = (self.memory.len() as u16) - PROGRAM_BEGIN_ADDR;
         if (program.len() as u16) > max_program_length {
@@ -99,7 +107,7 @@ impl Emulator {
         self.last_random_u8
     }
 
-    // #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
+    // #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     fn get_opcode(&self) -> Result<Instruction, Error> {
         let first_byte: u8 = self
             .memory
@@ -116,7 +124,7 @@ impl Emulator {
         Instruction::parse(raw_opcode)
     }
 
-    #[cfg_attr(not(target_arch = "wasm32"), no_mangle)]
+    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     pub extern "C" fn tick(&mut self, keypad: &[bool]) -> u32 {
         // update timers (even if blocking for keypress)
         if self.delay_timer > 0 {
@@ -126,18 +134,30 @@ impl Emulator {
             self.sound_timer -= 1;
         }
 
-        match self.waiting_for_key {
-            Some((register_index, _, false)) => {
+        match self.waiting_key {
+            Some(WaitingKey {
+                register_index,
+                key_index: _,
+                has_been_pressed: false,
+            }) => {
                 if let Some(key_index) = keypad.iter().take(NUM_KEYS).position(|pressed| *pressed) {
-                    self.waiting_for_key = Some((register_index, key_index, true));
+                    self.waiting_key = Some(WaitingKey {
+                        register_index,
+                        key_index,
+                        has_been_pressed: true
+                    });
                     return 0;
                 }
-            }
-            Some((register_index, key_index, true)) => {
+            },
+            Some(WaitingKey {
+                register_index,
+                key_index,
+                has_been_pressed: true,
+            }) => {
                 if !keypad[key_index] {
                     self.registers[register_index] = key_index as u8;
                     self.program_counter += 2;
-                    self.waiting_for_key = None;
+                    self.waiting_key = None;
                 }
             }
             None => {}
@@ -344,7 +364,11 @@ impl Emulator {
                 self.program_counter += 2;
             }
             Instruction::OpFx0A(register_index) => {
-                self.waiting_for_key = Some((register_index as usize, 0, false));
+                self.waiting_key = Some(WaitingKey {
+                    register_index: register_index as usize,
+                    key_index: 0,
+                    has_been_pressed: false
+                });
             }
             Instruction::OpFx15(register_index) => {
                 self.delay_timer = self.registers[register_index as usize];

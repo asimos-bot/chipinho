@@ -246,7 +246,6 @@ pub fn main() -> Result<(), String> {
         }
         // update the game loop here
         if (Instant::now() - start).as_millis() >= 16 {
-            // println!("opcode: {}", emulator.get_opcode().map_err(|e| format!("error getting opcode"))?.to_str());
             let res = emulator.tick(&keypad);
             if res != 0 {
                 let err : Error = res.into();
