@@ -33,12 +33,17 @@ pub struct Emulator {
     stack: [u16; MAX_STACK_SIZE],
     memory: [u8; MEMORY_SIZE as usize],
     vram: [u8; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
+
+    #[cfg(target_family = "wasm")]
+    pub display_height: u8,
+    #[cfg(target_family = "wasm")]
+    pub display_width: u8,
 }
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Emulator {
     #[cfg_attr(not(target_family = "wasm"), no_mangle)]
-    // #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
+    #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> Self {
         let mut emulator = Emulator {
             program_counter: PROGRAM_BEGIN_ADDR,
@@ -52,6 +57,11 @@ impl Emulator {
             stack: [0; MAX_STACK_SIZE],
             memory: [0; MEMORY_SIZE as usize],
             vram: [0; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
+
+            #[cfg(target_family = "wasm")]
+            display_height: DISPLAY_HEIGHT,
+            #[cfg(target_family = "wasm")]
+            display_width: DISPLAY_WIDTH,
         };
 
         // load fonts to memory
@@ -66,27 +76,13 @@ impl Emulator {
     }
 
     #[cfg_attr(not(target_family = "wasm"), no_mangle)]
-    pub extern "C" fn get_memory_ptr(&self) -> *const u8 {
-        let u8_slice: &[u8] = unsafe {
-            core::slice::from_raw_parts(self.memory.as_ptr() as *const u8, self.memory.len())
-        };
-        u8_slice.as_ptr()
-    }
-
-    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
-    pub extern "C" fn get_vram_ptr(&self) -> *const u8 {
-        // Convert the bool slice to a u8 slice
-        let u8_slice: &[u8] = unsafe {
-            core::slice::from_raw_parts(self.vram.as_ptr() as *const u8, self.vram.len())
-        };
-
-        // Return the pointer to the u8 slice
-        u8_slice.as_ptr()
-    }
-
-    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     pub extern "C" fn should_beep(&self) -> bool {
         self.sound_timer > 0
+    }
+    
+    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
+    pub extern "C" fn reset_program(&mut self) {
+        self.program_counter = PROGRAM_BEGIN_ADDR;
     }
 
     #[cfg_attr(not(target_family = "wasm"), no_mangle)]
@@ -95,6 +91,7 @@ impl Emulator {
         if (program.len() as u16) > max_program_length {
             return Error::NotEnoughMemoryForProgram.into();
         }
+        self.program_counter = PROGRAM_BEGIN_ADDR;
         self.memory
             .iter_mut() // grab memory mutably
             .skip(PROGRAM_BEGIN_ADDR as usize) // skip to address where program will be written to
@@ -113,12 +110,12 @@ impl Emulator {
     }
 
     #[cfg(target_family = "wasm")]
-    pub fn get_vram(&self) -> *const u8 {
-        self.vram.as_ptr()
+    pub fn get_vram(&self) -> Vec<u8> {
+        self.vram.to_vec()
     }
 
-    #[cfg(not(target_family = "wasm"))]
     #[no_mangle]
+    #[cfg(not(target_family = "wasm"))]
     pub extern "C" fn get_vram(&self) -> &[u8] {
         &self.vram
     }

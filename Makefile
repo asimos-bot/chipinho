@@ -1,6 +1,6 @@
 .PHONY: build-wasm
 build-wasm:
-	wasm-pack build --target web --out-dir examples/wasm/pkg chipinho/
+	wasm-pack build --target web --out-dir ../examples/wasm/pkg chipinho/
 show-wasm: build-wasm
 	wasm2wat chipinho/target/wasm32-unknown-unknown/release/chipinho.wasm | less
 serve-wasm: build-wasm

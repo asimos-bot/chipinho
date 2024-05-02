@@ -4,12 +4,99 @@
     <meta charset="utf-8" />
     <title>hello-wasm example</title>
   </head>
-  <body>
+  <body style="background-color: #191919">
+    <div style="width: auto;">
+      <canvas id="canvas" style="border-style: solid; border-color: white"></canvas>
+    </div>
+    <div>
+      <span>
+        <a>insert ch8 program here:</a>
+        <input type="file" id="file-handler" accept=".ch8,.bin,.data"></input>
+      </span>
+    </div>
+    <div>
+      <button type="button" id="btn-run">RUN</button>
+      <button id="btn-pause">PAUSE</button>
+      <button id="btn-reset">RESET</button>
+    </div>
     <script type="module">
-      import init, { greet } from "./pkg/hello_wasm.js";
+      const canvas = document.getElementById("canvas");
+      const keypad = new Uint8Array(0, 16);
+      const keypad_map = ["1", "2", "3", "4", "q", "w", "e", "r", "a", "s", "d", "f", "z", "x", "c", "v"]
+      document.addEventListener("keydown", (e) => {
+        keypad[keypad_map.indexOf(e.key)] = 1
+      })
+      document.addEventListener("keyup", (e) => {
+        keypad[keypad_map.indexOf(e.key)] = 0
+      })
+      const ctx = canvas.getContext("2d");
+      import init, { Emulator, WaitingKey } from "./pkg/chipinho.js";
       init().then(() => {
-        greet("WebAssembly");
-      });
+        let emulator = new Emulator();
+        let intervalID = null;
+        let isRunning = false;
+        function run_emulator() {
+          if(!isRunning) {
+            return;
+          }
+          let res = emulator.tick(keypad)
+          if( res != 0 ) {
+            console.error("Error on program tick")
+          }
+          ctx.fillStyle = "white"
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          ctx.fillStyle = "black"
+          const rectWidth = Math.round(canvas.width / emulator.display_width);
+          const rectHeight = Math.round(canvas.height / emulator.display_height);
+          emulator
+            .get_vram()
+            .forEach((pixel, index) => {
+              if(pixel != 0) {
+                const x = Math.round(index % emulator.display_width) * rectHeight;
+                const y = Math.round(index / emulator.display_width) * rectWidth;
+                ctx.fillRect(x, y, rectWidth, rectHeight)
+              }
+            })
+        }
+        document.getElementById("file-handler").addEventListener("change", (e) => {
+          if(e.target.files.length < 1) {
+            return;
+          }
+          let reader = new FileReader();
+          reader.readAsArrayBuffer(e.target.files[0])
+          reader.onload = (evt) => {
+            console.log("loading program")
+            let res = emulator.load_program(new Uint8Array(evt.target.result))
+            if(res != 0) {
+              console.error("Error when loading program!")
+            } else {
+              console.log("Program loaded!")
+            }
+          }
+          reader.onerror = (evt) => alert("Error reading file")
+        })
+        document.getElementById("btn-run").addEventListener("click", () => {
+          console.log("run/unpause")
+          if(intervalID == null) {
+            intervalID = setInterval(run_emulator, 16)
+            isRunning = true;
+          }
+        })
+        document.getElementById("btn-pause").addEventListener("click", () => {
+          console.log("pause")
+          isRunning = false;
+        })
+        document.getElementById("btn-reset").addEventListener("click", () => {
+          console.log("reset")
+          if(intervalID != null) {
+            clearInterval(intervalID);
+            intervalID = null;
+            isRunning = false;
+            emulator.reset_program();
+            document.getElementById("file-handler").value = ""
+          }
+        })
+      })
     </script>
   </body>
 </html>
