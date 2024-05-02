@@ -8,6 +8,7 @@ use crate::{
     instruction::Instruction,
 };
 
+#[derive(Clone, Copy)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 #[cfg_attr(not(target_family = "wasm"), repr(C))]
 pub struct WaitingKey {
@@ -16,6 +17,7 @@ pub struct WaitingKey {
     has_been_pressed: bool,
 }
 
+#[derive(Clone, Copy)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 #[cfg_attr(not(target_family = "wasm"), repr(C))]
 pub struct Emulator {
@@ -26,15 +28,17 @@ pub struct Emulator {
     pub waiting_key: Option<WaitingKey>,
     pub last_random_u8: u8,
     pub stack_size: u16,
-    pub registers: [u8; NUM_REGISTERS],
-    pub stack: [u16; MAX_STACK_SIZE],
-    pub memory: [u8; MEMORY_SIZE as usize],
-    pub vram: [bool; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
+
+    registers: [u8; NUM_REGISTERS],
+    stack: [u16; MAX_STACK_SIZE],
+    memory: [u8; MEMORY_SIZE as usize],
+    vram: [u8; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
 }
 
 #[cfg_attr(target_family = "wasm", wasm_bindgen)]
 impl Emulator {
     #[cfg_attr(not(target_family = "wasm"), no_mangle)]
+    // #[cfg_attr(target_family = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> Self {
         let mut emulator = Emulator {
             program_counter: PROGRAM_BEGIN_ADDR,
@@ -47,8 +51,9 @@ impl Emulator {
             registers: [0; NUM_REGISTERS],
             stack: [0; MAX_STACK_SIZE],
             memory: [0; MEMORY_SIZE as usize],
-            vram: [false; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
+            vram: [0; DISPLAY_WIDTH as usize * DISPLAY_HEIGHT as usize],
         };
+
         // load fonts to memory
         emulator
             .memory
@@ -107,6 +112,17 @@ impl Emulator {
         self.last_random_u8
     }
 
+    #[cfg(target_family = "wasm")]
+    pub fn get_vram(&self) -> *const u8 {
+        self.vram.as_ptr()
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[no_mangle]
+    pub extern "C" fn get_vram(&self) -> &[u8] {
+        &self.vram
+    }
+
     // #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     fn get_opcode(&self) -> Result<Instruction, Error> {
         let first_byte: u8 = self
@@ -125,7 +141,7 @@ impl Emulator {
     }
 
     #[cfg_attr(not(target_family = "wasm"), no_mangle)]
-    pub extern "C" fn tick(&mut self, keypad: &[bool]) -> u32 {
+    pub extern "C" fn tick(&mut self, keypad: &[u8]) -> u32 {
         // update timers (even if blocking for keypress)
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
@@ -140,7 +156,7 @@ impl Emulator {
                 key_index: _,
                 has_been_pressed: false,
             }) => {
-                if let Some(key_index) = keypad.iter().take(NUM_KEYS).position(|pressed| *pressed) {
+                if let Some(key_index) = keypad.iter().take(NUM_KEYS).position(|pressed| *pressed != 0) {
                     self.waiting_key = Some(WaitingKey {
                         register_index,
                         key_index,
@@ -154,7 +170,7 @@ impl Emulator {
                 key_index,
                 has_been_pressed: true,
             }) => {
-                if !keypad[key_index] {
+                if keypad[key_index] == 0 {
                     self.registers[register_index] = key_index as u8;
                     self.program_counter += 2;
                     self.waiting_key = None;
@@ -171,13 +187,13 @@ impl Emulator {
         }
     }
 
-    fn run_opcode(&mut self, opcode: Instruction, keypad: &[bool]) -> () {
+    fn run_opcode(&mut self, opcode: Instruction, keypad: &[u8]) -> () {
         match opcode {
             Instruction::Op0nnn(addr) => {
                 self.program_counter = addr as u16;
             }
             Instruction::Op00E0 => {
-                self.vram.iter_mut().for_each(|pixel| *pixel = false);
+                self.vram.iter_mut().for_each(|pixel| *pixel = 0);
                 self.program_counter += 2;
             }
             Instruction::Op00EE => {
@@ -342,19 +358,19 @@ impl Emulator {
                         let pixel =
                             &mut self.vram[py as usize * DISPLAY_WIDTH as usize + px as usize];
                         self.registers[NUM_REGISTERS - 1] |= color & (*pixel) as u8;
-                        *pixel ^= color != 0;
+                        *pixel ^= (color != 0) as u8;
                     }
                 }
                 self.program_counter += 2;
             }
             Instruction::OpEx9E(register_index) => {
-                if keypad[self.registers[register_index as usize] as usize] {
+                if keypad[self.registers[register_index as usize] as usize] != 0 {
                     self.program_counter += 2;
                 }
                 self.program_counter += 2;
             }
             Instruction::OpExA1(register_index) => {
-                if !keypad[self.registers[register_index as usize] as usize] {
+                if keypad[self.registers[register_index as usize] as usize] == 0 {
                     self.program_counter += 2;
                 }
                 self.program_counter += 2;

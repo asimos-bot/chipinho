@@ -88,7 +88,7 @@ pub fn main() -> Result<(), String> {
     if emulator.load_program(&program) != 0 {
         return Err(format!("error loading program"));
     }
-    let mut keypad: [bool; NUM_KEYS] = [false; NUM_KEYS];
+    let mut keypad: [u8; NUM_KEYS] = [0; NUM_KEYS];
     let mut start = Instant::now();
 
     'running: loop {
@@ -115,132 +115,132 @@ pub fn main() -> Result<(), String> {
                     keycode: Some(Keycode::Num1),
                     repeat: true,
                     ..
-                } => keypad[0x01] = true,
+                } => keypad[0x01] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::Num2),
                     ..
-                } => keypad[0x02] = true,
+                } => keypad[0x02] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::Num3),
                     ..
-                } => keypad[0x03] = true,
+                } => keypad[0x03] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::Num4),
                     ..
-                } => keypad[0x0C] = true,
+                } => keypad[0x0C] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::Q),
                     ..
-                } => keypad[0x04] = true,
+                } => keypad[0x04] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::W),
                     ..
-                } => keypad[0x05] = true,
+                } => keypad[0x05] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::E),
                     ..
-                } => keypad[0x06] = true,
+                } => keypad[0x06] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::R),
                     ..
-                } => keypad[0x0D] = true,
+                } => keypad[0x0D] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::A),
                     ..
-                } => keypad[0x07] = true,
+                } => keypad[0x07] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::S),
                     ..
-                } => keypad[0x08] = true,
+                } => keypad[0x08] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::D),
                     ..
-                } => keypad[0x09] = true,
+                } => keypad[0x09] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::F),
                     ..
-                } => keypad[0x0E] = true,
+                } => keypad[0x0E] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::Z),
                     ..
-                } => keypad[0x0A] = true,
+                } => keypad[0x0A] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::X),
                     ..
-                } => keypad[0x00] = true,
+                } => keypad[0x00] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::C),
                     ..
-                } => keypad[0x0B] = true,
+                } => keypad[0x0B] = 1,
                 Event::KeyDown {
                     keycode: Some(Keycode::V),
                     ..
-                } => keypad[0x0F] = true,
+                } => keypad[0x0F] = 1,
                 Event::KeyUp {
                     keycode: Some(Keycode::Num1),
                     repeat: false,
                     ..
-                } => keypad[0x01] = false,
+                } => keypad[0x01] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::Num2),
                     ..
-                } => keypad[0x02] = false,
+                } => keypad[0x02] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::Num3),
                     ..
-                } => keypad[0x03] = false,
+                } => keypad[0x03] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::Num4),
                     ..
-                } => keypad[0x0C] = false,
+                } => keypad[0x0C] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::Q),
                     ..
-                } => keypad[0x04] = false,
+                } => keypad[0x04] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::W),
                     ..
-                } => keypad[0x05] = false,
+                } => keypad[0x05] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::E),
                     ..
-                } => keypad[0x06] = false,
+                } => keypad[0x06] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::R),
                     ..
-                } => keypad[0x0D] = false,
+                } => keypad[0x0D] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::A),
                     ..
-                } => keypad[0x07] = false,
+                } => keypad[0x07] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::S),
                     ..
-                } => keypad[0x08] = false,
+                } => keypad[0x08] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::D),
                     ..
-                } => keypad[0x09] = false,
+                } => keypad[0x09] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::F),
                     ..
-                } => keypad[0x0E] = false,
+                } => keypad[0x0E] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::Z),
                     ..
-                } => keypad[0x0A] = false,
+                } => keypad[0x0A] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::X),
                     ..
-                } => keypad[0x00] = false,
+                } => keypad[0x00] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::C),
                     ..
-                } => keypad[0x0B] = false,
+                } => keypad[0x0B] = 0,
                 Event::KeyUp {
                     keycode: Some(Keycode::V),
                     ..
-                } => keypad[0x0F] = false,
+                } => keypad[0x0F] = 0,
                 _ => {}
             }
         }
@@ -261,12 +261,12 @@ pub fn main() -> Result<(), String> {
         // iterate over pixels and get which color to print each square
         canvas.fill_rects(
             &emulator
-            .vram
+            .get_vram()
             .iter()
             .enumerate()
             .filter_map(|(index, pixel)| -> Option<Rect> {
                 let i = index as u32;
-                if *pixel {
+                if *pixel != 0 {
                     let x = i % DISPLAY_WIDTH as u32;
                     let y = i / DISPLAY_WIDTH as u32;
                     return Some(Rect::new(

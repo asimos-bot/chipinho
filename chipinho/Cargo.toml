@@ -9,9 +9,5 @@ publish = true
 [lib]
 crate-type = ["cdylib", "lib"]
 
-[features]
-default = []
-wasm-bindgen = ["dep:wasm-bindgen"]
-
-[dependencies]
-wasm-bindgen = { version = "0.2.92", optional = true }
+[target.'cfg(target_family="wasm")'.dependencies]
+wasm-bindgen = { version = "0.2.92" }
