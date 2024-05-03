@@ -79,11 +79,6 @@ impl Emulator {
     pub extern "C" fn should_beep(&self) -> bool {
         self.sound_timer > 0
     }
-    
-    #[cfg_attr(not(target_family = "wasm"), no_mangle)]
-    pub extern "C" fn reset_program(&mut self) {
-        self.program_counter = PROGRAM_BEGIN_ADDR;
-    }
 
     #[cfg_attr(not(target_family = "wasm"), no_mangle)]
     pub extern "C" fn load_program(&mut self, program: &[u8]) -> u32 {

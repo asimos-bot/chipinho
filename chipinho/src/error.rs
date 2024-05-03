@@ -1,3 +1,4 @@
+
 #[derive(Debug)]
 pub enum Error {
     ParseInvalidInstruction(u16),
@@ -27,5 +28,14 @@ impl Into<Error> for u32 {
             0x3 => Error::NotEnoughMemoryForProgram,
             _ => Error::None
         }
+    }
+}
+
+#[cfg(target_family = "wasm")]
+use wasm_bindgen::JsValue;
+#[cfg(target_family = "wasm")]
+impl Into<JsValue> for Error {
+    fn into(self) -> JsValue {
+        JsValue::from_f64(u32::from(self) as f64)
     }
 }

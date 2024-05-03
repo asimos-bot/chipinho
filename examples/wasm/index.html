@@ -5,8 +5,8 @@
     <title>hello-wasm example</title>
   </head>
   <body style="background-color: #191919">
-    <div style="width: auto;">
-      <canvas id="canvas" style="border-style: solid; border-color: white"></canvas>
+    <div>
+      <canvas id="canvas" style="width: 200px; height: 100px; border-style: solid; border-color: white"></canvas>
     </div>
     <div>
       <span>
@@ -21,13 +21,20 @@
     </div>
     <script type="module">
       const canvas = document.getElementById("canvas");
-      const keypad = new Uint8Array(0, 16);
-      const keypad_map = ["1", "2", "3", "4", "q", "w", "e", "r", "a", "s", "d", "f", "z", "x", "c", "v"]
+      const keypad = new Uint8Array(Array(16).fill(0));
+      const keypad_map = {
+        "1": 1, "2": 2, "3": 3, "4": 0xC,
+        "q": 0x4, "w": 0x5, "e": 0x6, "r": 0xD,
+        "a": 0x7, "s": 0x8, "d": 0x9, "f": 0xE,
+        "z": 0xA, "x": 0x0, "c": 0xB, "v": 0xF
+      }
       document.addEventListener("keydown", (e) => {
-        keypad[keypad_map.indexOf(e.key)] = 1
+        if(!Object.hasOwn(keypad_map, e.key)) return;
+        keypad[keypad_map[e.key]] = 1
       })
       document.addEventListener("keyup", (e) => {
-        keypad[keypad_map.indexOf(e.key)] = 0
+        if(!Object.hasOwn(keypad_map, e.key)) return;
+        keypad[keypad_map[e.key]] = 0
       })
       const ctx = canvas.getContext("2d");
       import init, { Emulator, WaitingKey } from "./pkg/chipinho.js";
@@ -39,21 +46,21 @@
           if(!isRunning) {
             return;
           }
-          let res = emulator.tick(keypad)
+          let res = emulator.tick(new Uint8Array(keypad))
           if( res != 0 ) {
             console.error("Error on program tick")
           }
           ctx.fillStyle = "white"
           ctx.fillRect(0, 0, canvas.width, canvas.height)
           ctx.fillStyle = "black"
-          const rectWidth = Math.round(canvas.width / emulator.display_width);
-          const rectHeight = Math.round(canvas.height / emulator.display_height);
+          const rectWidth = Math.floor(canvas.width / emulator.display_width);
+          const rectHeight = Math.floor(canvas.height / emulator.display_height);
           emulator
             .get_vram()
             .forEach((pixel, index) => {
               if(pixel != 0) {
-                const x = Math.round(index % emulator.display_width) * rectHeight;
-                const y = Math.round(index / emulator.display_width) * rectWidth;
+                const x = Math.floor(index % emulator.display_width) * rectHeight;
+                const y = Math.floor(index / emulator.display_width) * rectWidth;
                 ctx.fillRect(x, y, rectWidth, rectHeight)
               }
             })
@@ -92,7 +99,8 @@
             clearInterval(intervalID);
             intervalID = null;
             isRunning = false;
-            emulator.reset_program();
+            emulator.free()
+            emulator = new Emulator();
             document.getElementById("file-handler").value = ""
           }
         })
